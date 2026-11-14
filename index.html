@@ -1,0 +1,2565 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مطعم الذواقة | نظام الطلبات والإدارة المتكامل</title>
+    
+    <!-- Google Fonts: Cairo -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Cairo', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f8fafc;
+            scroll-behavior: smooth;
+        }
+        /* إخفاء شريط التمرير مع بقاء وظيفته */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* إعدادات الطباعة الحرارية للكاشير (80mm) */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #app-wrapper, #toast-container {
+                display: none !important;
+            }
+            #print-area, #print-area * {
+                visibility: visible;
+            }
+            #print-area {
+                display: block !important;
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 80mm;
+                padding: 4mm;
+                margin: 0;
+                background: #fff;
+                color: #000;
+                font-family: 'Cairo', monospace;
+                font-size: 12px;
+            }
+            @page {
+                margin: 0;
+                size: 80mm auto;
+            }
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-primary-500 selection:text-white">
+
+    <!-- حاوية الإشعارات (Toasts) -->
+    <div id="toast-container" class="fixed bottom-5 left-5 z-[100] flex flex-col gap-2"></div>
+
+    <!-- منطقة الطباعة الحرارية (مخفية في الوضع العادي وتظهر عند الطباعة فقط) -->
+    <div id="print-area" class="hidden"></div>
+
+    <!-- الحاوية الرئيسية للتطبيق -->
+    <div id="app-wrapper" class="min-h-screen flex flex-col">
+
+        <!-- ==========================================
+             1. واجهة العميل (CUSTOMER VIEW)
+        =========================================== -->
+        <div id="view-customer" class="flex-grow flex flex-col">
+            
+            <!-- الهيدر / شريط التنقل -->
+            <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100 shadow-sm">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+                    <!-- الشعار والاسم -->
+                    <a href="#" class="flex items-center gap-3 group">
+                        <div class="w-12 h-12 rounded-2xl bg-primary-600 text-white flex items-center justify-center text-2xl shadow-md shadow-primary-500/20 group-hover:scale-105 transition">
+                            <i id="header-logo-icon" class="fa-solid fa-utensils"></i>
+                        </div>
+                        <div>
+                            <h1 id="header-resto-name" class="text-xl font-extrabold text-slate-900 tracking-tight">مطعم الذواقة</h1>
+                            <p class="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                مفتوح الآن ويستقبل الطلبات
+                            </p>
+                        </div>
+                    </a>
+
+                    <!-- روابط سريعة -->
+                    <nav class="hidden md:flex items-center gap-8 text-sm font-bold text-slate-600">
+                        <a href="#hero-section" class="hover:text-primary-600 transition">الرئيسية</a>
+                        <a href="#hygiene-section" class="hover:text-primary-600 transition">معايير النظافة والجودة</a>
+                        <a href="#menu-section" class="hover:text-primary-600 transition">قائمة الطعام</a>
+                    </nav>
+
+                    <!-- أزرار السلة ودخول الموظفين -->
+                    <div class="flex items-center gap-3">
+                        <button onclick="app.openCart()" class="relative inline-flex items-center gap-2.5 bg-primary-50 hover:bg-primary-100 text-primary-700 font-bold px-4 py-2.5 rounded-xl transition">
+                            <i class="fa-solid fa-bag-shopping text-lg"></i>
+                            <span class="hidden sm:inline">سلة الطلبات</span>
+                            <span id="cart-badge" class="bg-primary-600 text-white text-xs w-6 h-6 rounded-full flex items-center justify-center font-extrabold shadow">0</span>
+                        </button>
+
+                        <button id="nav-staff-btn" onclick="app.openLoginModal()" class="text-slate-500 hover:text-slate-800 hover:bg-slate-100 p-2.5 rounded-xl transition" title="بوابة الموظفين والإدارة">
+                            <i class="fa-solid fa-user-shield text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- قسم الترحيب (Hero Section) -->
+            <section id="hero-section" class="relative overflow-hidden bg-gradient-to-b from-amber-50/70 via-white to-slate-50 py-14 lg:py-20">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                        <div class="lg:col-span-7 space-y-6 text-center lg:text-right">
+                            <div class="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-1.5 rounded-full text-xs font-bold">
+                                <i class="fa-solid fa-shield-heart"></i>
+                                <span>طعام صحي، نظيف، ومحضر بكل حب100%</span>
+                            </div>
+                            <h2 id="hero-title" class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 leading-tight">
+                                مذاق أصيل يجمع بين <span class="text-primary-600">اللذة</span> وأعلى معايير <span class="text-emerald-600">النظافة</span>
+                            </h2>
+                            <p id="hero-desc" class="text-lg text-slate-600 leading-relaxed max-w-2xl mx-auto lg:mx-0">
+                                نختار مكوناتنا يومياً بعناية فائقة لنقدم لك ولعائلتك وجبات شهية تُحضر في بيئة معقمة بالكامل وتصلك ساخنة وطازجة حتى باب منزلك.
+                            </p>
+                            <div class="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-2">
+                                <a href="#menu-section" class="bg-primary-600 hover:bg-primary-700 text-white font-bold px-8 py-4 rounded-2xl shadow-lg shadow-primary-600/25 hover:-translate-y-0.5 transition flex items-center gap-3">
+                                    <span>تصفح المنيو واطلب الآن</span>
+                                    <i class="fa-solid fa-arrow-down"></i>
+                                </a>
+                                <a href="#hygiene-section" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold px-6 py-4 rounded-2xl transition flex items-center gap-2">
+                                    <i class="fa-solid fa-certificate text-emerald-600"></i>
+                                    <span>كيف نضمن نظافة طعامك؟</span>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="lg:col-span-5 relative">
+                            <div class="relative mx-auto max-w-md lg:max-w-none">
+                                <div class="absolute -inset-4 bg-gradient-to-tr from-primary-500/20 to-emerald-500/20 rounded-3xl blur-2xl"></div>
+                                <img src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=80" alt="طبق شهي" class="relative rounded-3xl shadow-2xl w-full h-[380px] object-cover border-4 border-white">
+                                <!-- شارة عائمة -->
+                                <div class="absolute -bottom-5 -right-5 bg-white p-4 rounded-2xl shadow-xl border border-slate-100 flex items-center gap-3">
+                                    <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl">
+                                        <i class="fa-solid fa-check-double"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs text-slate-400 font-bold">ضمان الجودة</p>
+                                        <p class="text-sm font-extrabold text-slate-800">مكونات طازجة يومياً</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- قسم معايير النظافة والجودة (Clean UI Cards) -->
+            <section id="hygiene-section" class="py-16 bg-white border-y border-slate-100">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="text-center max-w-2xl mx-auto mb-12 space-y-3">
+                        <span class="text-emerald-600 font-extrabold text-sm tracking-wider uppercase bg-emerald-50 px-3 py-1 rounded-full">التزامنا تجاه صحتكم</span>
+                        <h3 class="text-3xl font-extrabold text-slate-900">معايير النظافة والجودة الصارمة</h3>
+                        <p class="text-slate-500 text-base">لأن صحتكم أمانة، نطبق بروتوكولات صحية دقيقة في كل خطوة بدءاً من استلام المواد الخام وحتى تسليم الطلب.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <!-- بطاقة 1 -->
+                        <div class="bg-slate-50/70 hover:bg-white p-7 rounded-3xl border border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition duration-300">
+                            <div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl mb-5">
+                                <i class="fa-solid fa-sparkles"></i>
+                            </div>
+                            <h4 class="text-lg font-extrabold text-slate-900 mb-2">نظافة المكان الشاملة</h4>
+                            <p class="text-sm text-slate-600 leading-relaxed">تعقيم وتنظيف دوري لكافة أسطح التحضير وصالات الطعام على مدار الساعة بمواد آمنة ومعتمدة صحياً.</p>
+                        </div>
+
+                        <!-- بطاقة 2 -->
+                        <div class="bg-slate-50/70 hover:bg-white p-7 rounded-3xl border border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition duration-300">
+                            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-2xl mb-5">
+                                <i class="fa-solid fa-Hands-bubbles"></i>
+                            </div>
+                            <h4 class="text-lg font-extrabold text-slate-900 mb-2">تعقيم الأدوات والطاقم</h4>
+                            <p class="text-sm text-slate-600 leading-relaxed">التزام تام بارتداء القفازات وأغطية الرأس والكمامات، مع تعقيم معدات الطهي بدرجات حرارة عالية.</p>
+                        </div>
+
+                        <!-- بطاقة 3 -->
+                        <div class="bg-slate-50/70 hover:bg-white p-7 rounded-3xl border border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition duration-300">
+                            <div class="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-2xl mb-5">
+                                <i class="fa-solid fa-leaf"></i>
+                            </div>
+                            <h4 class="text-lg font-extrabold text-slate-900 mb-2">طزاجة المكونات 100%</h4>
+                            <p class="text-sm text-slate-600 leading-relaxed">نستخدم لحوماً محلية طازجة وخضروات تُقطف يومياً، ولا نستخدم أي مواد حافظة أو لحوم مجمدة مجهولة.</p>
+                        </div>
+
+                        <!-- بطاقة 4 -->
+                        <div class="bg-slate-50/70 hover:bg-white p-7 rounded-3xl border border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition duration-300">
+                            <div class="w-14 h-14 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center text-2xl mb-5">
+                                <i class="fa-solid fa-fire-burner"></i>
+                            </div>
+                            <h4 class="text-lg font-extrabold text-slate-900 mb-2">تحضير صحي وتغليف آمن</h4>
+                            <p class="text-sm text-slate-600 leading-relaxed">طهي صحي بزيوت نقية تُغير باستمرار، وتغليف حراري محكم يحفظ حرارة الطعام ويمنع أي تلوث خارجي.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- قسم قائمة الطعام التفاعلية (Menu Section) -->
+            <section id="menu-section" class="py-16 flex-grow">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+                    
+                    <!-- العنوان وشريط البحث -->
+                    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                        <div>
+                            <span class="text-primary-600 font-extrabold text-sm">اختر وجبتك المفضلة</span>
+                            <h3 class="text-3xl font-extrabold text-slate-900 mt-1">قائمة الطعام الشهية</h3>
+                        </div>
+
+                        <!-- حقل البحث -->
+                        <div class="relative w-full md:w-80">
+                            <i class="fa-solid fa-magnifying-glass absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <input type="text" id="menu-search" oninput="app.renderCustomerMenu()" placeholder="ابحث عن وجبة، مشروب، حلى..." class="w-full pr-11 pl-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 shadow-sm transition">
+                        </div>
+                    </div>
+
+                    <!-- أزرار التصنيفات -->
+                    <div id="customer-categories" class="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2">
+                        <!-- يتم تعبئتها ديناميكياً -->
+                    </div>
+
+                    <!-- شبكة الوجبات -->
+                    <div id="customer-menu-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-7">
+                        <!-- يتم تعبئتها ديناميكياً -->
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- الفوتر (Footer) -->
+            <footer class="bg-slate-900 text-slate-400 py-12 border-t border-slate-800">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-primary-600 text-white flex items-center justify-center text-lg">
+                            <i class="fa-solid fa-utensils"></i>
+                        </div>
+                        <div>
+                            <p id="footer-resto-name" class="text-white font-bold">مطعم الذواقة</p>
+                            <p class="text-xs text-slate-500">جميع الحقوق محفوظة © <span id="footer-year"></span></p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-4">
+                        <button onclick="app.openLoginModal()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+                            <i class="fa-solid fa-lock"></i>
+                            <span>دخول الموظفين والإدارة</span>
+                        </button>
+                    </div>
+                </div>
+            </footer>
+        </div>
+
+        <!-- ==========================================
+             2. نافذة السلة وإتمام الطلب (CART DRAWER)
+        =========================================== -->
+        <div id="cart-drawer" class="fixed inset-0 z-50 hidden">
+            <!-- خلفية معتمة -->
+            <div onclick="app.closeCart()" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"></div>
+
+            <!-- اللوحة الجانبية -->
+            <div class="fixed inset-y-0 left-0 max-w-full flex pl-10">
+                <div class="w-screen max-w-md bg-white shadow-2xl flex flex-col justify-between">
+                    
+                    <!-- رأس السلة -->
+                    <div class="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center text-lg">
+                                <i class="fa-solid fa-bag-shopping"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-extrabold text-slate-900">سلة المشتريات</h3>
+                                <p class="text-xs text-slate-500">راجع طلبك وأكمل بيانات الاستلام</p>
+                            </div>
+                        </div>
+                        <button onclick="app.closeCart()" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    <!-- محتوى السلة القابل للتمرير -->
+                    <div class="p-6 overflow-y-auto flex-grow space-y-6">
+                        
+                        <!-- قائمة العناصر -->
+                        <div id="cart-items-container" class="space-y-3"></div>
+
+                        <!-- قسم إتمام الطلب (يظهر فقط عند وجود عناصر) -->
+                        <div id="cart-checkout-form" class="space-y-5 pt-4 border-t border-slate-100">
+                            
+                            <!-- كود الخصم -->
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1.5">كود الخصم (إن وجد)</label>
+                                <div class="flex gap-2">
+                                    <input type="text" id="cart-coupon-input" placeholder="مثال: WELCOME10" class="flex-grow px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:border-primary-500">
+                                    <button onclick="app.applyCoupon()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition">تطبيق</button>
+                                </div>
+                                <p id="cart-coupon-msg" class="text-xs mt-1 hidden"></p>
+                            </div>
+
+                            <!-- نوع الطلب -->
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-2">نوع الطلب</label>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <button type="button" onclick="app.setOrderType('delivery')" id="type-btn-delivery" class="order-type-btn py-2.5 px-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition">
+                                        <i class="fa-solid fa-motorcycle text-base"></i>
+                                        <span>توصيل للمنزل</span>
+                                    </button>
+                                    <button type="button" onclick="app.setOrderType('pickup')" id="type-btn-pickup" class="order-type-btn py-2.5 px-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition">
+                                        <i class="fa-solid fa-person-walking text-base"></i>
+                                        <span>استلام من الفرع</span>
+                                    </button>
+                                    <button type="button" onclick="app.setOrderType('dinein')" id="type-btn-dinein" class="order-type-btn py-2.5 px-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition">
+                                        <i class="fa-solid fa-chair text-base"></i>
+                                        <span>محلي بالمطعم</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- بيانات العميل الأساسية -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">الاسم الكريم *</label>
+                                    <input type="text" id="cust-name" placeholder="الاسم الثلاثي" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">رقم الهاتف *</label>
+                                    <input type="tel" id="cust-phone" placeholder="05XXXXXXXX" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary-500">
+                                </div>
+                            </div>
+
+                            <!-- حقول خاصة بالتوصيل -->
+                            <div id="delivery-fields" class="space-y-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">منطقة التوصيل *</label>
+                                    <select id="cust-zone" onchange="app.updateCartSummary()" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary-500">
+                                        <!-- يملأ ديناميكياً -->
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">العنوان بالتفصيل *</label>
+                                    <textarea id="cust-address" rows="2" placeholder="الحي، الشارع، رقم المبنى، معلم قريب..." class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary-500"></textarea>
+                                </div>
+                            </div>
+
+                            <!-- حقل خاص بالمحلي (رقم الطاولة) -->
+                            <div id="dinein-fields" class="hidden">
+                                <label class="block text-xs font-bold text-slate-700 mb-1">رقم الطاولة *</label>
+                                <input type="number" id="cust-table" min="1" placeholder="أدخل رقم الطاولة الموجود أمامك" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary-500">
+                            </div>
+
+                            <!-- ملاحظات إضافية -->
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">ملاحظات على الطلب (اختياري)</label>
+                                <input type="text" id="cust-notes" placeholder="بدون بصل، صوص إضافي، إلخ..." class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ملخص الفاتورة وزر الإرسال للواتساب -->
+                    <div id="cart-footer" class="p-6 border-t border-slate-100 bg-slate-50 space-y-4">
+                        <div class="space-y-1.5 text-sm">
+                            <div class="flex justify-between text-slate-600">
+                                <span>المجموع الفرعي:</span>
+                                <span id="summary-subtotal" class="font-bold">0</span>
+                            </div>
+                            <div id="summary-discount-row" class="flex justify-between text-emerald-600 hidden">
+                                <span>الخصم:</span>
+                                <span id="summary-discount" class="font-bold">-0</span>
+                            </div>
+                            <div id="summary-delivery-row" class="flex justify-between text-slate-600">
+                                <span>رسوم التوصيل:</span>
+                                <span id="summary-delivery" class="font-bold">0</span>
+                            </div>
+                            <div class="flex justify-between text-base font-extrabold text-slate-900 pt-2 border-t border-slate-200">
+                                <span>الإجمالي النهائي (الدفع عند الاستلام):</span>
+                                <span id="summary-total" class="text-primary-600">0</span>
+                            </div>
+                        </div>
+
+                        <button onclick="app.submitCustomerOrder()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3.5 px-6 rounded-2xl shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2.5 transition">
+                            <i class="fa-brands fa-whatsapp text-xl"></i>
+                            <span>تأكيد الطلب وإرسال عبر واتساب</span>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ==========================================
+             3. لوحة تحكم الكاشير (CASHIER DASHBOARD)
+        =========================================== -->
+        <div id="view-cashier" class="hidden flex-grow flex flex-col bg-slate-100">
+            <!-- شريط علوي للكاشير -->
+            <header class="bg-slate-900 text-white px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-md">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center text-lg font-bold">
+                        <i class="fa-solid fa-cash-register"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="font-extrabold text-lg">لوحة الكاشير ونقطة البيع (POS)</h2>
+                            <span id="cashier-name-badge" class="bg-slate-800 text-emerald-400 text-xs px-2.5 py-0.5 rounded-full font-bold"></span>
+                        </div>
+                        <p id="cashier-permissions-list" class="text-xs text-slate-400"></p>
+                    </div>
+                </div>
+
+                <!-- إجمالي مبيعات الوردية (تظهر حسب الصلاحية) -->
+                <div id="cashier-sales-box" class="hidden bg-slate-800 border border-slate-700 px-4 py-2 rounded-xl flex items-center gap-3">
+                    <i class="fa-solid fa-sack-dollar text-emerald-400 text-xl"></i>
+                    <div>
+                        <p class="text-[11px] text-slate-400">مبيعات الطلبات المكتملة</p>
+                        <p id="cashier-total-sales" class="text-sm font-extrabold text-white">0</p>
+                    </div>
+                </div>
+
+                <!-- التبويبات والخروج -->
+                <div class="flex items-center gap-2">
+                    <button onclick="app.switchCashierTab('orders')" id="ctab-orders" class="px-4 py-2 rounded-xl text-xs font-bold bg-primary-600 text-white transition">
+                        <i class="fa-solid fa-list-check ml-1"></i> الطلبات الحالية
+                    </button>
+                    <button onclick="app.switchCashierTab('pos')" id="ctab-pos" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+                        <i class="fa-solid fa-calculator ml-1"></i> نقطة بيع مباشر (POS)
+                    </button>
+                    <button onclick="app.switchCashierTab('menu')" id="ctab-menu" class="hidden px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+                        <i class="fa-solid fa-utensils ml-1"></i> توفر الوجبات
+                    </button>
+                    <button onclick="app.switchToCustomerView()" class="px-3 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 transition" title="معاينة الموقع">
+                        <i class="fa-solid fa-globe"></i>
+                    </button>
+                    <button onclick="app.logout()" class="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition">
+                        <i class="fa-solid fa-right-from-bracket ml-1"></i> خروج
+                    </button>
+                </div>
+            </header>
+
+            <!-- محتوى الكاشير -->
+            <main class="max-w-7xl w-full mx-auto p-6 flex-grow">
+                
+                <!-- تبويب 1: إدارة الطلبات -->
+                <div id="cashier-section-orders" class="space-y-6">
+                    <div class="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-xs border border-slate-200/80">
+                        <div class="flex items-center gap-2 overflow-x-auto">
+                            <button onclick="app.setCashierOrderFilter('all')" class="c-filter-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white" data-status="all">الكل</button>
+                            <button onclick="app.setCashierOrderFilter('preparing')" class="c-filter-btn px-4 py-2 rounded-xl text-xs font-bold bg-amber-50 text-amber-700" data-status="preparing">قيد التحضير</button>
+                            <button onclick="app.setCashierOrderFilter('delivering')" class="c-filter-btn px-4 py-2 rounded-xl text-xs font-bold bg-blue-50 text-blue-700" data-status="delivering">جاري التوصيل</button>
+                            <button onclick="app.setCashierOrderFilter('completed')" class="c-filter-btn px-4 py-2 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700" data-status="completed">مكتمل</button>
+                            <button onclick="app.setCashierOrderFilter('cancelled')" class="c-filter-btn px-4 py-2 rounded-xl text-xs font-bold bg-rose-50 text-rose-700" data-status="cancelled">ملغي</button>
+                        </div>
+                        <div class="text-xs text-slate-500 font-bold">
+                            إجمالي الطلبات المعروضة: <span id="cashier-orders-count" class="text-slate-900 font-extrabold">0</span>
+                        </div>
+                    </div>
+
+                    <div id="cashier-orders-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        <!-- بطاقات الطلبات -->
+                    </div>
+                </div>
+
+                <!-- تبويب 2: نقطة البيع المباشر (POS) -->
+                <div id="cashier-section-pos" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- اختيار الوجبات -->
+                    <div class="lg:col-span-8 bg-white p-5 rounded-3xl shadow-xs border border-slate-200/80 space-y-4">
+                        <div class="flex items-center justify-between gap-4">
+                            <h3 class="font-extrabold text-slate-900">اختر الأصناف لإضافتها للفاتورة</h3>
+                            <input type="text" id="pos-search" oninput="app.renderPOSMenu()" placeholder="بحث سريع عن صنف..." class="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs w-64 focus:outline-none focus:border-primary-500">
+                        </div>
+                        <div id="pos-menu-grid" class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[65vh] overflow-y-auto p-1">
+                            <!-- أصناف الكاشير -->
+                        </div>
+                    </div>
+
+                    <!-- الفاتورة الحالية -->
+                    <div class="lg:col-span-4 bg-white p-5 rounded-3xl shadow-xs border border-slate-200/80 flex flex-col justify-between h-fit sticky top-6">
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                                <h3 class="font-extrabold text-slate-900 flex items-center gap-2">
+                                    <i class="fa-solid fa-receipt text-primary-600"></i>
+                                    <span>فاتورة نقطة بيع</span>
+                                </h3>
+                                <button onclick="app.clearPOSCart()" class="text-xs text-rose-600 hover:underline font-bold">إفراغ</button>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="text" id="pos-cust-name" placeholder="اسم العميل (اختياري)" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                                <select id="pos-order-type" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold">
+                                    <option value="pickup">سفري / استلام</option>
+                                    <option value="dinein">محلي داخل المطعم</option>
+                                </select>
+                            </div>
+
+                            <div id="pos-cart-items" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
+
+                            <!-- خصم يدوي (يظهر فقط إذا كان للكاشير صلاحية) -->
+                            <div id="pos-discount-wrapper" class="hidden pt-2 border-t border-slate-100">
+                                <label class="block text-xs font-bold text-slate-700 mb-1">خصم يدوي (قيمة ثابتة)</label>
+                                <input type="number" id="pos-manual-discount" min="0" value="0" oninput="app.renderPOSCart()" class="w-full px-3 py-2 bg-amber-50/60 border border-amber-200 rounded-xl text-xs font-bold">
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-slate-200 mt-4 space-y-3">
+                            <div class="flex justify-between text-xs text-slate-600">
+                                <span>المجموع الفرعي:</span>
+                                <span id="pos-subtotal" class="font-bold">0</span>
+                            </div>
+                            <div class="flex justify-between text-base font-extrabold text-slate-900">
+                                <span>الإجمالي المطلوب:</span>
+                                <span id="pos-total" class="text-primary-600">0</span>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2 pt-2">
+                                <button onclick="app.submitPOSOrder(false)" class="bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl text-xs transition">
+                                    حفظ الطلب فقط
+                                </button>
+                                <button onclick="app.submitPOSOrder(true)" class="bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition">
+                                    <i class="fa-solid fa-print"></i>
+                                    <span>حفظ وطباعة</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- تبويب 3: إدارة توفر الوجبات للكاشير (حسب الصلاحية) -->
+                <div id="cashier-section-menu" class="hidden bg-white p-6 rounded-3xl shadow-xs border border-slate-200/80 space-y-4">
+                    <h3 class="font-extrabold text-lg text-slate-900">تحديث حالة توفر الوجبات السريع</h3>
+                    <div id="cashier-menu-availability-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+                </div>
+
+            </main>
+        </div>
+
+
+        <!-- ==========================================
+             4. لوحة تحكم المالك / الأدمن (ADMIN DASHBOARD)
+        =========================================== -->
+        <div id="view-admin" class="hidden flex-grow flex flex-col bg-slate-100">
+            <!-- الهيدر العلوي للأدمن -->
+            <header class="bg-slate-900 text-white px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-md">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center text-lg font-extrabold">
+                        <i class="fa-solid fa-crown"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-extrabold text-lg">لوحة تحكم المالك (الإدارة العليا)</h2>
+                        <p class="text-xs text-slate-400">تحكم كامل في المنيو، الموظفين، الصلاحيات، والإحصائيات</p>
+                    </div>
+                </div>
+
+                <!-- شريط التبويبات للأدمن -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <button onclick="app.switchAdminTab('analytics')" id="atab-analytics" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-primary-600 text-white transition">
+                        <i class="fa-solid fa-chart-pie ml-1"></i> الإحصائيات والطلبات
+                    </button>
+                    <button onclick="app.switchAdminTab('menu')" id="atab-menu" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+                        <i class="fa-solid fa-burger ml-1"></i> إدارة المنيو
+                    </button>
+                    <button onclick="app.switchAdminTab('staff')" id="atab-staff" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+                        <i class="fa-solid fa-users-gear ml-1"></i> الموظفين والصلاحيات
+                    </button>
+                    <button onclick="app.switchAdminTab('settings')" id="atab-settings" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+                        <i class="fa-solid fa-sliders ml-1"></i> الإعدادات والنسخ الاحتياطي
+                    </button>
+                    <button onclick="app.switchToCustomerView()" class="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition" title="العودة لواجهة الموقع">
+                        <i class="fa-solid fa-eye ml-1"></i> عرض الموقع
+                    </button>
+                    <button onclick="app.logout()" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- محتوى لوحة الأدمن -->
+            <main class="max-w-7xl w-full mx-auto p-6 flex-grow space-y-8">
+                
+                <!-- قسم 1: الإحصائيات والطلبات -->
+                <div id="admin-section-analytics" class="space-y-8">
+                    <!-- بطاقات الإحصائيات -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                        <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-4">
+                            <div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl">
+                                <i class="fa-solid fa-coins"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-slate-400">إجمالي المبيعات (المكتملة)</p>
+                                <h4 id="stat-total-sales" class="text-2xl font-extrabold text-slate-900 mt-0.5">0</h4>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-4">
+                            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-2xl">
+                                <i class="fa-solid fa-check-circle"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-slate-400">الطلبات المكتملة</p>
+                                <h4 id="stat-completed-orders" class="text-2xl font-extrabold text-slate-900 mt-0.5">0</h4>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-4">
+                            <div class="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-2xl">
+                                <i class="fa-solid fa-clock-rotate-left"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-slate-400">طلبات قيد التنفيذ الآن</p>
+                                <h4 id="stat-active-orders" class="text-2xl font-extrabold text-slate-900 mt-0.5">0</h4>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-4">
+                            <div class="w-14 h-14 rounded-2xl bg-primary-100 text-primary-600 flex items-center justify-center text-2xl">
+                                <i class="fa-solid fa-fire"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-slate-400">الأكثر مبيعاً</p>
+                                <h4 id="stat-top-item" class="text-base font-extrabold text-slate-900 mt-0.5 line-clamp-1">-</h4>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <!-- أكثر الوجبات طلباً -->
+                        <div class="lg:col-span-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+                            <h3 class="font-extrabold text-slate-900 flex items-center gap-2">
+                                <i class="fa-solid fa-trophy text-amber-500"></i>
+                                <span>أكثر الوجبات مبيعاً</span>
+                            </h3>
+                            <div id="admin-top-items-list" class="space-y-3"></div>
+                        </div>
+
+                        <!-- سجل كافة الطلبات -->
+                        <div class="lg:col-span-8 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h3 class="font-extrabold text-slate-900">أحدث الطلبات في النظام</h3>
+                                <span class="text-xs text-slate-500">يمكنك طباعة أو تغيير حالة أي طلب</span>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-right text-xs">
+                                    <thead>
+                                        <tr class="border-b border-slate-200 text-slate-400">
+                                            <th class="pb-3 font-bold">رقم الطلب</th>
+                                            <th class="pb-3 font-bold">العميل / النوع</th>
+                                            <th class="pb-3 font-bold">الإجمالي</th>
+                                            <th class="pb-3 font-bold">الحالة</th>
+                                            <th class="pb-3 font-bold">إجراءات</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-orders-tbody" class="divide-y divide-slate-100"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- قسم 2: إدارة المنيو والتصنيفات -->
+                <div id="admin-section-menu" class="hidden space-y-8">
+                    <!-- إدارة التصنيفات -->
+                    <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+                        <h3 class="font-extrabold text-slate-900">إدارة تصنيفات الطعام</h3>
+                        <div class="flex flex-wrap gap-3 items-center">
+                            <input type="text" id="new-cat-name" placeholder="اسم التصنيف الجديد (مثلاً: مشويات)" class="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs w-64">
+                            <input type="text" id="new-cat-icon" placeholder="أيقونة FontAwesome (مثلاً: fa-fire)" value="fa-bowl-food" class="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs w-56">
+                            <button onclick="app.addCategory()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition">
+                                <i class="fa-solid fa-plus ml-1"></i> إضافة تصنيف
+                            </button>
+                        </div>
+                        <div id="admin-categories-list" class="flex flex-wrap gap-2 pt-2"></div>
+                    </div>
+
+                    <!-- إدارة الوجبات -->
+                    <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
+                        <div class="flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <h3 class="font-extrabold text-lg text-slate-900">قائمة الوجبات والأصناف</h3>
+                                <p class="text-xs text-slate-500">إضافة، تعديل، حذف، أو إيقاف توفر أي وجبة فوراً</p>
+                            </div>
+                            <button onclick="app.openMealModal()" class="bg-primary-600 hover:bg-primary-700 text-white font-bold px-5 py-3 rounded-2xl text-xs shadow-md shadow-primary-500/20 flex items-center gap-2 transition">
+                                <i class="fa-solid fa-plus"></i>
+                                <span>إضافة وجبة جديدة</span>
+                            </button>
+                        </div>
+
+                        <div id="admin-meals-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5"></div>
+                    </div>
+                </div>
+
+                <!-- قسم 3: إدارة العمال والصلاحيات (RBAC) -->
+                <div id="admin-section-staff" class="hidden space-y-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <!-- نموذج إضافة/تعديل عامل -->
+                        <div class="lg:col-span-5 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4 h-fit">
+                            <h3 id="staff-form-title" class="font-extrabold text-lg text-slate-900">إضافة موظف كاشير جديد</h3>
+                            <input type="hidden" id="staff-edit-id">
+                            
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">اسم الموظف *</label>
+                                <input type="text" id="staff-name" placeholder="مثال: أحمد محمد" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">اسم المستخدم للدخول *</label>
+                                    <input type="text" id="staff-username" placeholder="cashier2" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">كلمة المرور *</label>
+                                    <input type="text" id="staff-password" placeholder="****" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                                </div>
+                            </div>
+
+                            <div class="pt-2">
+                                <label class="block text-xs font-extrabold text-slate-900 mb-3">صلاحيات الموظف المسموحة:</label>
+                                <div class="space-y-2.5 bg-slate-50 p-4 rounded-2xl border border-slate-200/70 text-xs font-bold text-slate-700">
+                                    <label class="flex items-center gap-2.5 cursor-pointer">
+                                        <input type="checkbox" id="perm-cancel" class="w-4 h-4 accent-primary-600 rounded">
+                                        <span>صلاحية إلغاء الطلبات (Cancel Orders)</span>
+                                    </label>
+                                    <label class="flex items-center gap-2.5 cursor-pointer">
+                                        <input type="checkbox" id="perm-discount" class="w-4 h-4 accent-primary-600 rounded">
+                                        <span>صلاحية منح خصم يدوي في نقطة البيع</span>
+                                    </label>
+                                    <label class="flex items-center gap-2.5 cursor-pointer">
+                                        <input type="checkbox" id="perm-menu" class="w-4 h-4 accent-primary-600 rounded">
+                                        <span>صلاحية تعديل توفر الوجبات (متوفر / نفذت)</span>
+                                    </label>
+                                    <label class="flex items-center gap-2.5 cursor-pointer">
+                                        <input type="checkbox" id="perm-sales" class="w-4 h-4 accent-primary-600 rounded">
+                                        <span>صلاحية رؤية إجمالي مبيعات الوردية</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-2 pt-2">
+                                <button onclick="app.saveStaff()" class="flex-grow bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-xl text-xs transition">
+                                    حفظ بيانات الموظف
+                                </button>
+                                <button onclick="app.resetStaffForm()" id="staff-cancel-edit" class="hidden bg-slate-200 text-slate-700 font-bold px-4 py-3 rounded-xl text-xs">
+                                    إلغاء
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- قائمة الموظفين الحاليين -->
+                        <div class="lg:col-span-7 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+                            <h3 class="font-extrabold text-lg text-slate-900">الموظفون المسجلون وصلاحياتهم</h3>
+                            <div id="admin-staff-list" class="space-y-3"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- قسم 4: الإعدادات العامة، التوصيل، الكوبونات، والنسخ الاحتياطي -->
+                <div id="admin-section-settings" class="hidden space-y-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        
+                        <!-- إعدادات المطعم والواتساب والأدمن -->
+                        <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+                            <h3 class="font-extrabold text-lg text-slate-900 border-b border-slate-100 pb-3">بيانات المطعم الأساسية</h3>
+                            
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">اسم المطعم</label>
+                                    <input type="text" id="set-resto-name" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">العملة المعروضة</label>
+                                    <input type="text" id="set-currency" placeholder="ر.س / ج.م / د.أ" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">رقم واتساب استقبال الطلبات (بالكود الدولي بدون +)</label>
+                                    <input type="text" id="set-whatsapp" placeholder="966500000000" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm dir-ltr">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">أيقونة الشعار (FontAwesome)</label>
+                                    <input type="text" id="set-logo-icon" placeholder="fa-utensils" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">كلمة مرور الأدمن الرئيسية</label>
+                                <input type="text" id="set-admin-pass" class="w-full px-3.5 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm font-bold">
+                            </div>
+
+                            <button onclick="app.saveGeneralSettings()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl text-xs transition">
+                                حفظ الإعدادات الأساسية
+                            </button>
+                        </div>
+
+                        <!-- إدارة مناطق التوصيل -->
+                        <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+                            <h3 class="font-extrabold text-lg text-slate-900 border-b border-slate-100 pb-3">مناطق وأسعار التوصيل</h3>
+                            <div class="flex gap-2">
+                                <input type="text" id="new-zone-name" placeholder="اسم المنطقة / الحي" class="flex-grow px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                                <input type="number" id="new-zone-fee" placeholder="سعر التوصيل" class="w-28 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                                <button onclick="app.addDeliveryZone()" class="bg-primary-600 text-white font-bold px-4 py-2 rounded-xl text-xs">إضافة</button>
+                            </div>
+                            <div id="admin-zones-list" class="space-y-2 max-h-56 overflow-y-auto"></div>
+                        </div>
+
+                        <!-- إدارة أكواد الخصم -->
+                        <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+                            <h3 class="font-extrabold text-lg text-slate-900 border-b border-slate-100 pb-3">أكواد الخصم (Coupons)</h3>
+                            <div class="flex gap-2">
+                                <input type="text" id="new-coupon-code" placeholder="الكود (مثال: EID20)" class="flex-grow px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs uppercase">
+                                <input type="number" id="new-coupon-percent" placeholder="نسبة الخصم %" min="1" max="100" class="w-32 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                                <button onclick="app.addCoupon()" class="bg-primary-600 text-white font-bold px-4 py-2 rounded-xl text-xs">إضافة</button>
+                            </div>
+                            <div id="admin-coupons-list" class="space-y-2 max-h-56 overflow-y-auto"></div>
+                        </div>
+
+                        <!-- النسخ الاحتياطي والاستعادة -->
+                        <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4 flex flex-col justify-between">
+                            <div class="space-y-2">
+                                <h3 class="font-extrabold text-lg text-slate-900 border-b border-slate-100 pb-3">النسخ الاحتياطي لقاعدة البيانات (Backup)</h3>
+                                <p class="text-xs text-slate-500 leading-relaxed">يمكنك تصدير كافة بيانات النظام (المنيو، الطلبات، الموظفين، الإعدادات) في ملف JSON للاحتفاظ بنسخة احتياطية أو نقلها لجهاز آخر.</p>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                                <button onclick="app.exportDatabase()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition">
+                                    <i class="fa-solid fa-download"></i>
+                                    <span>تصدير البيانات (JSON)</span>
+                                </button>
+
+                                <label class="bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer transition">
+                                    <i class="fa-solid fa-upload"></i>
+                                    <span>استيراد ملف بيانات</span>
+                                    <input type="file" accept=".json" onchange="app.importDatabase(event)" class="hidden">
+                                </label>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </main>
+        </div>
+
+    </div>
+
+
+    <!-- ==========================================
+         5. النوافذ المنبثقة (MODALS)
+    =========================================== -->
+
+    <!-- نافذة تسجيل دخول الموظفين والأدمن -->
+    <div id="login-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-5 border border-slate-100">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-10 h-10 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-user-lock"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-slate-900">دخول الموظفين</h3>
+                        <p class="text-xs text-slate-500">الكاشير أو إدارة المطعم</p>
+                    </div>
+                </div>
+                <button onclick="app.closeLoginModal()" class="text-slate-400 hover:text-slate-700">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form onsubmit="app.handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">اسم المستخدم</label>
+                    <input type="text" id="login-username" required placeholder="admin أو اسم الكاشير" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">كلمة المرور</label>
+                    <input type="password" id="login-password" required placeholder="••••••••" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary-500">
+                </div>
+                <button type="submit" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-xl text-sm shadow-lg shadow-primary-600/20 transition">
+                    تسجيل الدخول
+                </button>
+            </form>
+
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/60 text-[11px] text-slate-500 space-y-1">
+                <p class="font-bold text-slate-700">بيانات تجريبية سريعة:</p>
+                <p>• المالك (الأدمن): <code class="bg-white px-1.5 py-0.5 rounded border">admin</code> / كلمة السر: <code class="bg-white px-1.5 py-0.5 rounded border">admin123</code></p>
+                <p>• الكاشير: <code class="bg-white px-1.5 py-0.5 rounded border">cashier1</code> / كلمة السر: <code class="bg-white px-1.5 py-0.5 rounded border">1234</code></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة إضافة / تعديل وجبة (للأدمن) -->
+    <div id="meal-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-100">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 id="meal-modal-title" class="font-extrabold text-lg text-slate-900">إضافة وجبة جديدة</h3>
+                <button onclick="app.closeMealModal()" class="text-slate-400 hover:text-slate-700">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form onsubmit="app.saveMeal(event)" class="space-y-3.5">
+                <input type="hidden" id="meal-id">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">اسم الوجبة *</label>
+                    <input type="text" id="meal-name" required placeholder="مثال: مشاوي مشكلة ملكي" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">التصنيف *</label>
+                        <select id="meal-category" required class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">السعر *</label>
+                        <input type="number" id="meal-price" step="0.5" min="1" required placeholder="45" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">رابط صورة الوجبة (URL) *</label>
+                    <input type="url" id="meal-image" required placeholder="https://images.unsplash.com/..." class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">وصف مختصر للوجبة *</label>
+                    <textarea id="meal-desc" rows="2" required placeholder="المكونات وطريقة التحضير..." class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm"></textarea>
+                </div>
+
+                <label class="flex items-center gap-2 cursor-pointer pt-1">
+                    <input type="checkbox" id="meal-available" checked class="w-4 h-4 accent-primary-600 rounded">
+                    <span class="text-xs font-bold text-slate-700">الوجبة متوفرة حالياً للطلب</span>
+                </label>
+
+                <button type="submit" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-xl text-sm transition">
+                    حفظ الوجبة
+                </button>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- ==========================================
+         6. منطق البرمجة الكامل (JAVASCRIPT ES6+)
+    =========================================== -->
+    <script>
+        const DB_KEY = 'gourmet_resto_spa_db_v1';
+
+        // البيانات الافتراضية (Seed Data)
+        const defaultSeedData = {
+            settings: {
+                restoName: 'مطعم الذواقة العصري',
+                currency: 'ر.س',
+                whatsapp: '966500000000',
+                logoIcon: 'fa-utensils',
+                adminPass: 'admin123'
+            },
+            categories: [
+                { id: 'cat_main', name: 'أطباق رئيسية', icon: 'fa-fire-burner' },
+                { id: 'cat_appetizers', name: 'مقبلات وسلطات', icon: 'fa-leaf' },
+                { id: 'cat_drinks', name: 'مشروبات طبيعية', icon: 'fa-glass-water' },
+                { id: 'cat_desserts', name: 'حلويات شرقية', icon: 'fa-cookie-bite' }
+            ],
+            menu: [
+                {
+                    id: 'm1',
+                    name: 'مشاوي مشكلة ملكي على الفحم',
+                    categoryId: 'cat_main',
+                    price: 65,
+                    desc: 'تشكيلة فاخرة من كباب اللحم الطازج، شيش طاووق متبل، وأوصال لحم مشوية على الفحم تقدم مع الأرز البسمتي والخبز الساخن.',
+                    image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=600&q=80',
+                    available: true,
+                    salesCount: 42
+                },
+                {
+                    id: 'm2',
+                    name: 'برجر أنجوس مشوي بالجبن المعتق',
+                    categoryId: 'cat_main',
+                    price: 38,
+                    desc: 'شريحة لحم أنجوس صافي 200 جرام مشوية على اللهب مع جبن شيدر ذائب، خس طازج، وصوص الذواقة الخاص في خبز البريوش الطري.',
+                    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&q=80',
+                    available: true,
+                    salesCount: 35
+                },
+                {
+                    id: 'm3',
+                    name: 'شاورما عربي دجاج محمرة',
+                    categoryId: 'cat_main',
+                    price: 28,
+                    desc: 'شرائح شاورما دجاج متبلة بتتبيلة خاصة ومحمصة في خبز الصاج مع الثومية الكريمية، المخلل، والبطاطس المقرمشة.',
+                    image: 'https://images.unsplash.com/photo-1529006557810-274b9b2fc783?auto=format&fit=crop&w=600&q=80',
+                    available: true,
+                    salesCount: 58
+                },
+                {
+                    id: 'm4',
+                    name: 'ستيك ريب آي بصوص الفطر',
+                    categoryId: 'cat_main',
+                    price: 85,
+                    desc: 'قطعة ريب آي فاخرة مطهوة حسب رغبتك مع صوص المشروم البري الكريمي وخضروات سوتيه طازجة.',
+                    image: 'https://images.unsplash.com/photo-1600891964092-4316c288032e?auto=format&fit=crop&w=600&q=80',
+                    available: false,
+                    salesCount: 19
+                },
+                {
+                    id: 'm5',
+                    name: 'تبولة شامية بزيت الزيتون البكر',
+                    categoryId: 'cat_appetizers',
+                    price: 16,
+                    desc: 'بقدونس مفروم طازج يومياً مع الطماطم، البرغل الناعم، عصير الليمون الطبيعي وزيت الزيتون البكر الممتاز.',
+                    image: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=600&q=80',
+                    available: true,
+                    salesCount: 27
+                },
+                {
+                    id: 'm6',
+                    name: 'حمص بيروتي بالصنوبر واللحم',
+                    categoryId: 'cat_appetizers',
+                    price: 22,
+                    desc: 'حمص كريمي ناعم محضر يومياً ومزين بقطع اللحم المفروم المحمر والصنوبر المقرمش.',
+                    image: 'https://images.unsplash.com/photo-1577805947697-89e18249d767?auto=format&fit=crop&w=600&q=80',
+                    available: true,
+                    salesCount: 31
+                },
+                {
+                    id: 'm7',
+                    name: 'موهيتو التوت الأزرق والنعناع',
+                    categoryId: 'cat_drinks',
+                    price: 18,
+                    desc: 'مزيج منعش من التوت الأزرق الطبيعي وأوراق النعناع الطازجة وشرائح الليمون مع المياه الغازية الباردة.',
+                    image: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=600&q=80',
+                    available: true,
+                    salesCount: 49
+                },
+                {
+                    id: 'm8',
+                    name: 'كنافة نابلسية بالجبن الساخن',
+                    categoryId: 'cat_desserts',
+                    price: 24,
+                    desc: 'كنافة ذهبية مقرمشة محشوة بالجبن النابلسي الأصلي ومغطاة بالفستق الحلبي الفاخر والقطر المعتدل.',
+                    image: 'https://images.unsplash.com/photo-1579372786545-d24232daf58c?auto=format&fit=crop&w=600&q=80',
+                    available: true,
+                    salesCount: 39
+                }
+            ],
+            zones: [
+                { id: 'z1', name: 'حي العليا والمركز', fee: 10 },
+                { id: 'z2', name: 'حي النخيل والياسمين', fee: 15 },
+                { id: 'z3', name: 'الضواحي والمناطق البعيدة', fee: 25 }
+            ],
+            coupons: [
+                { code: 'WELCOME10', percent: 10 },
+                { code: 'VIP20', percent: 20 }
+            ],
+            staff: [
+                {
+                    id: 'st_1',
+                    name: 'خالد العتيبي (كاشير أول)',
+                    username: 'cashier1',
+                    password: '1234',
+                    permissions: {
+                        canCancel: true,
+                        canDiscount: true,
+                        canManageMenu: true,
+                        canViewSales: true
+                    }
+                },
+                {
+                    id: 'st_2',
+                    name: 'سارة محمود (كاشير مسائي)',
+                    username: 'cashier2',
+                    password: '1234',
+                    permissions: {
+                        canCancel: false,
+                        canDiscount: false,
+                        canManageMenu: true,
+                        canViewSales: false
+                    }
+                }
+            ],
+            orders: [
+                {
+                    id: 'ORD-1001',
+                    date: '2025-02-20 14:30',
+                    type: 'delivery',
+                    customerName: 'فهد السبيعي',
+                    customerPhone: '0551234567',
+                    address: 'حي النخيل، شارع التخصصي، فيلا 14',
+                    zoneName: 'حي النخيل والياسمين',
+                    tableNum: '',
+                    items: [
+                        { id: 'm1', name: 'مشاوي مشكلة ملكي على الفحم', price: 65, qty: 2 },
+                        { id: 'm7', name: 'موهيتو التوت الأزرق والنعناع', price: 18, qty: 2 }
+                    ],
+                    subtotal: 166,
+                    discount: 0,
+                    deliveryFee: 15,
+                    total: 181,
+                    status: 'completed',
+                    notes: 'الرجاء زيادة الخبز الساخن',
+                    createdBy: 'عميل (أونلاين)'
+                },
+                {
+                    id: 'ORD-1002',
+                    date: '2025-02-20 15:10',
+                    type: 'dinein',
+                    customerName: 'عبدالرحمن الشهري',
+                    customerPhone: '0509876543',
+                    address: '',
+                    zoneName: '',
+                    tableNum: '5',
+                    items: [
+                        { id: 'm3', name: 'شاورما عربي دجاج محمرة', price: 28, qty: 2 },
+                        { id: 'm5', name: 'تبولة شامية بزيت الزيتون البكر', price: 16, qty: 1 }
+                    ],
+                    subtotal: 72,
+                    discount: 0,
+                    deliveryFee: 0,
+                    total: 72,
+                    status: 'preparing',
+                    notes: 'بدون مخلل',
+                    createdBy: 'عميل (أونلاين)'
+                }
+            ]
+        };
+
+        // الكائن الرئيسي للتطبيق
+        const app = {
+            db: null,
+            currentCategory: 'all',
+            cart: [],
+            appliedCoupon: null,
+            orderType: 'delivery',
+            currentUser: null, // { role: 'admin' | 'cashier', data: {...} }
+            cashierOrderFilter: 'all',
+            posCart: [],
+
+            // تهيئة التطبيق عند التحميل
+            init() {
+                this.loadDB();
+                document.getElementById('footer-year').textContent = new Date().getFullYear();
+                this.applyBranding();
+                this.renderCustomerCategories();
+                this.renderCustomerMenu();
+                this.setOrderType('delivery');
+                this.renderDeliveryZonesDropdown();
+                this.updateCartBadge();
+            },
+
+            // تحميل أو تهيئة قاعدة البيانات المحلية
+            loadDB() {
+                const saved = localStorage.getItem(DB_KEY);
+                if (saved) {
+                    try {
+                        this.db = JSON.parse(saved);
+                    } catch (e) {
+                        this.db = JSON.parse(JSON.stringify(defaultSeedData));
+                        this.saveDB();
+                    }
+                } else {
+                    this.db = JSON.parse(JSON.stringify(defaultSeedData));
+                    this.saveDB();
+                }
+            },
+
+            saveDB() {
+                localStorage.setItem(DB_KEY, JSON.stringify(this.db));
+            },
+
+            formatMoney(amount) {
+                return `${Number(amount).toFixed(2)} ${this.db.settings.currency}`;
+            },
+
+            // إشعارات أنيقة (Toast)
+            toast(message, type = 'success') {
+                const container = document.getElementById('toast-container');
+                const el = document.createElement('div');
+                const colors = {
+                    success: 'bg-emerald-600 text-white',
+                    error: 'bg-rose-600 text-white',
+                    info: 'bg-slate-800 text-white'
+                };
+                const icons = {
+                    success: 'fa-circle-check',
+                    error: 'fa-circle-exclamation',
+                    info: 'fa-circle-info'
+                };
+                el.className = `${colors[type] || colors.info} px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 text-xs font-bold transition-all duration-300`;
+                el.innerHTML = `<i class="fa-solid ${icons[type] || icons.info} text-base"></i><span>${message}</span>`;
+                container.appendChild(el);
+                setTimeout(() => {
+                    el.style.opacity = '0';
+                    setTimeout(() => el.remove(), 300);
+                }, 3200);
+            },
+
+            // تطبيق اسم المطعم والشعار
+            applyBranding() {
+                const s = this.db.settings;
+                document.getElementById('header-resto-name').textContent = s.restoName;
+                document.getElementById('footer-resto-name').textContent = s.restoName;
+                document.getElementById('header-logo-icon').className = `fa-solid ${s.logoIcon || 'fa-utensils'}`;
+                document.title = `${s.restoName} | نظام الطلبات والإدارة`;
+            },
+
+            // ==========================================
+            // منطق واجهة العميل (Customer View)
+            // ==========================================
+            renderCustomerCategories() {
+                const container = document.getElementById('customer-categories');
+                let html = `
+                    <button onclick="app.selectCategory('all')" class="px-5 py-3 rounded-2xl text-xs font-extrabold whitespace-nowrap transition flex items-center gap-2 ${this.currentCategory === 'all' ? 'bg-primary-600 text-white shadow-md shadow-primary-500/20' : 'bg-white text-slate-600 border border-slate-200 hover:border-primary-300'}">
+                        <i class="fa-solid fa-border-all"></i>
+                        <span>جميع الأصناف</span>
+                    </button>
+                `;
+                this.db.categories.forEach(cat => {
+                    const active = this.currentCategory === cat.id;
+                    html += `
+                        <button onclick="app.selectCategory('${cat.id}')" class="px-5 py-3 rounded-2xl text-xs font-extrabold whitespace-nowrap transition flex items-center gap-2 ${active ? 'bg-primary-600 text-white shadow-md shadow-primary-500/20' : 'bg-white text-slate-600 border border-slate-200 hover:border-primary-300'}">
+                            <i class="fa-solid ${cat.icon || 'fa-utensils'}"></i>
+                            <span>${cat.name}</span>
+                        </button>
+                    `;
+                });
+                container.innerHTML = html;
+            },
+
+            selectCategory(catId) {
+                this.currentCategory = catId;
+                this.renderCustomerCategories();
+                this.renderCustomerMenu();
+            },
+
+            renderCustomerMenu() {
+                const grid = document.getElementById('customer-menu-grid');
+                const query = (document.getElementById('menu-search')?.value || '').trim().toLowerCase();
+
+                const filtered = this.db.menu.filter(item => {
+                    const matchesCat = this.currentCategory === 'all' || item.categoryId === this.currentCategory;
+                    const matchesSearch = item.name.toLowerCase().includes(query) || item.desc.toLowerCase().includes(query);
+                    return matchesCat && matchesSearch;
+                });
+
+                if (filtered.length === 0) {
+                    grid.innerHTML = `
+                        <div class="col-span-full bg-white rounded-3xl p-12 text-center border border-slate-100">
+                            <i class="fa-solid fa-plate-wheat text-4xl text-slate-300 mb-3"></i>
+                            <p class="font-bold text-slate-700">لا توجد وجبات مطابقة لبحثك حالياً</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                grid.innerHTML = filtered.map(meal => {
+                    const cat = this.db.categories.find(c => c.id === meal.categoryId);
+                    return `
+                        <div class="bg-white rounded-3xl border border-slate-100 shadow-xs hover:shadow-xl transition duration-300 overflow-hidden flex flex-col justify-between group">
+                            <div>
+                                <div class="relative h-52 overflow-hidden bg-slate-100">
+                                    <img src="${meal.image}" alt="${meal.name}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500 ${!meal.available ? 'grayscale opacity-75' : ''}">
+                                    <span class="absolute top-3 right-3 bg-white/90 backdrop-blur-xs text-slate-700 text-[11px] font-bold px-3 py-1 rounded-full shadow-xs">
+                                        ${cat ? cat.name : 'عام'}
+                                    </span>
+                                    ${!meal.available ? `
+                                        <div class="absolute inset-0 bg-slate-900/50 flex items-center justify-center">
+                                            <span class="bg-rose-600 text-white font-extrabold text-xs px-4 py-2 rounded-full shadow-lg">نفذت الكمية</span>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                                <div class="p-5 space-y-2">
+                                    <h4 class="font-extrabold text-base text-slate-900 line-clamp-1">${meal.name}</h4>
+                                    <p class="text-xs text-slate-500 leading-relaxed line-clamp-2">${meal.desc}</p>
+                                </div>
+                            </div>
+
+                            <div class="px-5 pb-5 pt-3 border-t border-slate-50 flex items-center justify-between gap-2">
+                                <div>
+                                    <span class="text-[11px] text-slate-400 block">السعر</span>
+                                    <span class="text-lg font-extrabold text-primary-600">${this.formatMoney(meal.price)}</span>
+                                </div>
+                                ${meal.available ? `
+                                    <button onclick="app.addToCart('${meal.id}')" class="bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md shadow-primary-500/20 flex items-center gap-2 transition active:scale-95">
+                                        <i class="fa-solid fa-plus"></i>
+                                        <span>إضافة للسلة</span>
+                                    </button>
+                                ` : `
+                                    <button disabled class="bg-slate-200 text-slate-400 text-xs font-bold px-4 py-2.5 rounded-xl cursor-not-allowed">
+                                        غير متوفر
+                                    </button>
+                                `}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            },
+
+            // ==========================================
+            // منطق سلة المشتريات وإتمام الطلب عبر واتساب
+            // ==========================================
+            addToCart(mealId) {
+                const meal = this.db.menu.find(m => m.id === mealId);
+                if (!meal || !meal.available) return;
+
+                const existing = this.cart.find(item => item.id === mealId);
+                if (existing) {
+                    existing.qty += 1;
+                } else {
+                    this.cart.push({
+                        id: meal.id,
+                        name: meal.name,
+                        price: Number(meal.price),
+                        image: meal.image,
+                        qty: 1
+                    });
+                }
+                this.updateCartBadge();
+                this.toast(`تمت إضافة "${meal.name}" إلى السلة`);
+            },
+
+            updateCartBadge() {
+                const count = this.cart.reduce((acc, item) => acc + item.qty, 0);
+                document.getElementById('cart-badge').textContent = count;
+            },
+
+            openCart() {
+                document.getElementById('cart-drawer').classList.remove('hidden');
+                this.renderDeliveryZonesDropdown();
+                this.renderCartDrawer();
+            },
+
+            closeCart() {
+                document.getElementById('cart-drawer').classList.add('hidden');
+            },
+
+            changeCartQty(mealId, delta) {
+                const item = this.cart.find(i => i.id === mealId);
+                if (!item) return;
+                item.qty += delta;
+                if (item.qty <= 0) {
+                    this.cart = this.cart.filter(i => i.id !== mealId);
+                }
+                this.updateCartBadge();
+                this.renderCartDrawer();
+            },
+
+            renderDeliveryZonesDropdown() {
+                const select = document.getElementById('cust-zone');
+                if (!select) return;
+                select.innerHTML = this.db.zones.map(z => `
+                    <option value="${z.id}">${z.name} (+${this.formatMoney(z.fee)})</option>
+                `).join('');
+            },
+
+            setOrderType(type) {
+                this.orderType = type;
+                const types = ['delivery', 'pickup', 'dinein'];
+                types.forEach(t => {
+                    const btn = document.getElementById(`type-btn-${t}`);
+                    if (!btn) return;
+                    if (t === type) {
+                        btn.className = 'order-type-btn py-2.5 px-3 rounded-xl border border-primary-600 bg-primary-50 text-primary-700 text-xs font-extrabold flex flex-col items-center gap-1 transition';
+                    } else {
+                        btn.className = 'order-type-btn py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold flex flex-col items-center gap-1 transition';
+                    }
+                });
+
+                document.getElementById('delivery-fields').classList.toggle('hidden', type !== 'delivery');
+                document.getElementById('dinein-fields').classList.toggle('hidden', type !== 'dinein');
+                document.getElementById('summary-delivery-row').classList.toggle('hidden', type !== 'delivery');
+                this.updateCartSummary();
+            },
+
+            applyCoupon() {
+                const input = document.getElementById('cart-coupon-input').value.trim().toUpperCase();
+                const msg = document.getElementById('cart-coupon-msg');
+                const found = this.db.coupons.find(c => c.code.toUpperCase() === input);
+
+                msg.classList.remove('hidden');
+                if (found) {
+                    this.appliedCoupon = found;
+                    msg.textContent = `تم تطبيق كود الخصم (${found.percent}%) بنجاح!`;
+                    msg.className = 'text-xs mt-1 font-bold text-emerald-600';
+                } else {
+                    this.appliedCoupon = null;
+                    msg.textContent = 'كود الخصم غير صحيح أو منتهي الصلاحية.';
+                    msg.className = 'text-xs mt-1 font-bold text-rose-600';
+                }
+                this.updateCartSummary();
+            },
+
+            renderCartDrawer() {
+                const container = document.getElementById('cart-items-container');
+                const form = document.getElementById('cart-checkout-form');
+                const footer = document.getElementById('cart-footer');
+
+                if (this.cart.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-14 space-y-3">
+                            <div class="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-2xl mx-auto">
+                                <i class="fa-solid fa-basket-shopping"></i>
+                            </div>
+                            <p class="font-bold text-slate-700">سلة المشتريات فارغة</p>
+                            <p class="text-xs text-slate-400">أضف وجباتك الشهية من القائمة للبدء في الطلب</p>
+                        </div>
+                    `;
+                    form.classList.add('hidden');
+                    footer.classList.add('hidden');
+                    return;
+                }
+
+                form.classList.remove('hidden');
+                footer.classList.remove('hidden');
+
+                container.innerHTML = this.cart.map(item => `
+                    <div class="flex items-center justify-between gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                        <img src="${item.image}" class="w-14 h-14 rounded-xl object-cover">
+                        <div class="flex-grow">
+                            <h5 class="text-xs font-extrabold text-slate-900 line-clamp-1">${item.name}</h5>
+                            <p class="text-xs font-bold text-primary-600 mt-0.5">${this.formatMoney(item.price * item.qty)}</p>
+                        </div>
+                        <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-2 py-1">
+                            <button onclick="app.changeCartQty('${item.id}', -1)" class="w-6 h-6 rounded-lg hover:bg-slate-100 text-slate-600 font-bold">-</button>
+                            <span class="text-xs font-extrabold w-5 text-center">${item.qty}</span>
+                            <button onclick="app.changeCartQty('${item.id}', 1)" class="w-6 h-6 rounded-lg hover:bg-slate-100 text-primary-600 font-bold">+</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                this.updateCartSummary();
+            },
+
+            calculateCartTotals() {
+                const subtotal = this.cart.reduce((sum, i) => sum + i.price * i.qty, 0);
+                const discount = this.appliedCoupon ? (subtotal * this.appliedCoupon.percent) / 100 : 0;
+                let deliveryFee = 0;
+                let zoneName = '';
+
+                if (this.orderType === 'delivery') {
+                    const zoneId = document.getElementById('cust-zone')?.value;
+                    const zone = this.db.zones.find(z => z.id === zoneId) || this.db.zones[0];
+                    if (zone) {
+                        deliveryFee = Number(zone.fee);
+                        zoneName = zone.name;
+                    }
+                }
+
+                const total = Math.max(0, subtotal - discount + deliveryFee);
+                return { subtotal, discount, deliveryFee, total, zoneName };
+            },
+
+            updateCartSummary() {
+                const { subtotal, discount, deliveryFee, total } = this.calculateCartTotals();
+                document.getElementById('summary-subtotal').textContent = this.formatMoney(subtotal);
+
+                const discRow = document.getElementById('summary-discount-row');
+                if (discount > 0) {
+                    discRow.classList.remove('hidden');
+                    document.getElementById('summary-discount').textContent = `-${this.formatMoney(discount)}`;
+                } else {
+                    discRow.classList.add('hidden');
+                }
+
+                document.getElementById('summary-delivery').textContent = this.formatMoney(deliveryFee);
+                document.getElementById('summary-total').textContent = this.formatMoney(total);
+            },
+
+            submitCustomerOrder() {
+                if (this.cart.length === 0) return;
+
+                const name = document.getElementById('cust-name').value.trim();
+                const phone = document.getElementById('cust-phone').value.trim();
+                const address = document.getElementById('cust-address').value.trim();
+                const tableNum = document.getElementById('cust-table').value.trim();
+                const notes = document.getElementById('cust-notes').value.trim();
+
+                if (!name || !phone) {
+                    this.toast('يرجى إدخال الاسم ورقم الهاتف لإتمام الطلب', 'error');
+                    return;
+                }
+                if (this.orderType === 'delivery' && !address) {
+                    this.toast('يرجى إدخال العنوان بالتفصيل للتوصيل', 'error');
+                    return;
+                }
+                if (this.orderType === 'dinein' && !tableNum) {
+                    this.toast('يرجى إدخال رقم الطاولة', 'error');
+                    return;
+                }
+
+                const { subtotal, discount, deliveryFee, total, zoneName } = this.calculateCartTotals();
+                const orderId = 'ORD-' + Math.floor(1000 + Math.random() * 9000);
+                const now = new Date();
+                const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+                const newOrder = {
+                    id: orderId,
+                    date: dateStr,
+                    type: this.orderType,
+                    customerName: name,
+                    customerPhone: phone,
+                    address: this.orderType === 'delivery' ? address : '',
+                    zoneName: this.orderType === 'delivery' ? zoneName : '',
+                    tableNum: this.orderType === 'dinein' ? tableNum : '',
+                    items: this.cart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
+                    subtotal,
+                    discount,
+                    deliveryFee,
+                    total,
+                    status: 'preparing',
+                    notes,
+                    createdBy: 'عميل (واتساب)'
+                };
+
+                // تحديث عداد المبيعات لكل وجبة
+                newOrder.items.forEach(item => {
+                    const m = this.db.menu.find(x => x.id === item.id);
+                    if (m) m.salesCount = (m.salesCount || 0) + item.qty;
+                });
+
+                this.db.orders.unshift(newOrder);
+                this.saveDB();
+
+                // تجهيز رسالة الواتساب الاحترافية
+                const typeLabels = {
+                    delivery: 'توصيل للمنزل 🛵',
+                    pickup: 'استلام من الفرع 🛍️',
+                    dinein: `محلي داخل المطعم (طاولة رقم ${tableNum}) 🍽️`
+                };
+
+                let msg = `*طلب جديد - ${this.db.settings.restoName}*\n`;
+                msg += `━━━━━━━━━━━━━━━━━━\n`;
+                msg += `🔖 *رقم الطلب:* ${orderId}\n`;
+                msg += `📅 *التاريخ:* ${dateStr}\n`;
+                msg += `📌 *نوع الطلب:* ${typeLabels[this.orderType]}\n`;
+                msg += `👤 *العميل:* ${name}\n`;
+                msg += `📞 *الهاتف:* ${phone}\n`;
+                if (this.orderType === 'delivery') {
+                    msg += `📍 *المنطقة:* ${zoneName}\n`;
+                    msg += `🏠 *العنوان:* ${address}\n`;
+                }
+                if (notes) msg += `📝 *ملاحظات:* ${notes}\n`;
+                msg += `━━━━━━━━━━━━━━━━━━\n`;
+                msg += `🍴 *تفاصيل الوجبات:*\n`;
+                newOrder.items.forEach(i => {
+                    msg += `• ${i.qty}x ${i.name} (${this.formatMoney(i.price * i.qty)})\n`;
+                });
+                msg += `━━━━━━━━━━━━━━━━━━\n`;
+                msg += `💵 المجموع الفرعي: ${this.formatMoney(subtotal)}\n`;
+                if (discount > 0) msg += `🎁 الخصم: -${this.formatMoney(discount)}\n`;
+                if (this.orderType === 'delivery') msg += `🛵 رسوم التوصيل: ${this.formatMoney(deliveryFee)}\n`;
+                msg += `💰 *الإجمالي المطلوب:* *${this.formatMoney(total)}*\n`;
+                msg += `🤝 *طريقة الدفع:* الدفع عند الاستلام\n`;
+
+                const waPhone = (this.db.settings.whatsapp || '').replace(/\D/g, '');
+                const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
+
+                // تفريغ السلة وإغلاقها
+                this.cart = [];
+                this.appliedCoupon = null;
+                this.updateCartBadge();
+                this.closeCart();
+                this.toast('تم حفظ طلبك وجاري تحويلك إلى واتساب...');
+
+                window.open(waUrl, '_blank');
+            },
+
+
+            // ==========================================
+            // نظام الدخول والصلاحيات (Auth & RBAC)
+            // ==========================================
+            openLoginModal() {
+                if (this.currentUser) {
+                    if (this.currentUser.role === 'admin') this.showView('admin');
+                    else this.showView('cashier');
+                    return;
+                }
+                document.getElementById('login-modal').classList.remove('hidden');
+            },
+
+            closeLoginModal() {
+                document.getElementById('login-modal').classList.add('hidden');
+            },
+
+            handleLogin(e) {
+                e.preventDefault();
+                const username = document.getElementById('login-username').value.trim();
+                const password = document.getElementById('login-password').value.trim();
+
+                // تحقق من الأدمن
+                if (username.toLowerCase() === 'admin' && password === this.db.settings.adminPass) {
+                    this.currentUser = { role: 'admin', name: 'المدير العام' };
+                    this.closeLoginModal();
+                    this.showView('admin');
+                    this.toast('مرحباً بك في لوحة تحكم المالك');
+                    return;
+                }
+
+                // تحقق من الكاشير
+                const staffMember = this.db.staff.find(s => s.username.toLowerCase() === username.toLowerCase() && s.password === password);
+                if (staffMember) {
+                    this.currentUser = { role: 'cashier', data: staffMember };
+                    this.closeLoginModal();
+                    this.showView('cashier');
+                    this.toast(`مرحباً بك، ${staffMember.name}`);
+                    return;
+                }
+
+                this.toast('اسم المستخدم أو كلمة المرور غير صحيحة', 'error');
+            },
+
+            logout() {
+                this.currentUser = null;
+                this.showView('customer');
+                this.toast('تم تسجيل الخروج بنجاح', 'info');
+            },
+
+            switchToCustomerView() {
+                this.showView('customer');
+            },
+
+            showView(viewName) {
+                document.getElementById('view-customer').classList.toggle('hidden', viewName !== 'customer');
+                document.getElementById('view-cashier').classList.toggle('hidden', viewName !== 'cashier');
+                document.getElementById('view-admin').classList.toggle('hidden', viewName !== 'admin');
+
+                if (viewName === 'customer') {
+                    this.applyBranding();
+                    this.renderCustomerCategories();
+                    this.renderCustomerMenu();
+                } else if (viewName === 'cashier') {
+                    this.initCashierDashboard();
+                } else if (viewName === 'admin') {
+                    this.initAdminDashboard();
+                }
+            },
+
+
+            // ==========================================
+            // لوحة تحكم الكاشير (Cashier Dashboard)
+            // ==========================================
+            initCashierDashboard() {
+                const staff = this.currentUser?.data;
+                if (!staff) return;
+
+                document.getElementById('cashier-name-badge').textContent = staff.name;
+
+                // عرض الصلاحيات الممنوحة لهذا العامل
+                const perms = [];
+                if (staff.permissions.canCancel) perms.push('إلغاء الطلبات');
+                if (staff.permissions.canDiscount) perms.push('منح خصم يدوي');
+                if (staff.permissions.canManageMenu) perms.push('تعديل توفر الوجبات');
+                if (staff.permissions.canViewSales) perms.push('رؤية المبيعات');
+                document.getElementById('cashier-permissions-list').textContent = 'الصلاحيات: ' + (perms.length ? perms.join(' • ') : 'استقبال وطباعة الطلبات فقط');
+
+                // تطبيق الصلاحيات على عناصر الواجهة
+                document.getElementById('cashier-sales-box').classList.toggle('hidden', !staff.permissions.canViewSales);
+                document.getElementById('ctab-menu').classList.toggle('hidden', !staff.permissions.canManageMenu);
+                document.getElementById('pos-discount-wrapper').classList.toggle('hidden', !staff.permissions.canDiscount);
+
+                this.updateCashierSalesBadge();
+                this.switchCashierTab('orders');
+            },
+
+            updateCashierSalesBadge() {
+                const totalSales = this.db.orders
+                    .filter(o => o.status === 'completed')
+                    .reduce((sum, o) => sum + Number(o.total), 0);
+                document.getElementById('cashier-total-sales').textContent = this.formatMoney(totalSales);
+            },
+
+            switchCashierTab(tab) {
+                const tabs = ['orders', 'pos', 'menu'];
+                tabs.forEach(t => {
+                    const sec = document.getElementById(`cashier-section-${t}`);
+                    const btn = document.getElementById(`ctab-${t}`);
+                    if (sec) sec.classList.toggle('hidden', t !== tab);
+                    if (btn) {
+                        if (t === tab) {
+                            btn.className = 'px-4 py-2 rounded-xl text-xs font-bold bg-primary-600 text-white transition';
+                        } else {
+                            btn.className = `px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 transition ${t === 'menu' && !this.currentUser?.data?.permissions?.canManageMenu ? 'hidden' : ''}`;
+                        }
+                    }
+                });
+
+                if (tab === 'orders') this.renderCashierOrders();
+                if (tab === 'pos') {
+                    this.renderPOSMenu();
+                    this.renderPOSCart();
+                }
+                if (tab === 'menu') this.renderCashierMenuAvailability();
+            },
+
+            setCashierOrderFilter(status) {
+                this.cashierOrderFilter = status;
+                document.querySelectorAll('.c-filter-btn').forEach(btn => {
+                    if (btn.dataset.status === status) {
+                        btn.classList.add('ring-2', 'ring-primary-500');
+                    } else {
+                        btn.classList.remove('ring-2', 'ring-primary-500');
+                    }
+                });
+                this.renderCashierOrders();
+            },
+
+            renderCashierOrders() {
+                const grid = document.getElementById('cashier-orders-grid');
+                const canCancel = this.currentUser?.data?.permissions?.canCancel;
+
+                const filtered = this.db.orders.filter(o => this.cashierOrderFilter === 'all' || o.status === this.cashierOrderFilter);
+                document.getElementById('cashier-orders-count').textContent = filtered.length;
+
+                if (filtered.length === 0) {
+                    grid.innerHTML = `<div class="col-span-full bg-white p-12 rounded-3xl text-center text-slate-400 font-bold">لا توجد طلبات في هذا التصنيف</div>`;
+                    return;
+                }
+
+                const statusBadge = {
+                    preparing: '<span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-extrabold">قيد التحضير ⏳</span>',
+                    delivering: '<span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-extrabold">جاري التوصيل 🛵</span>',
+                    completed: '<span class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-extrabold">مكتمل ✅</span>',
+                    cancelled: '<span class="bg-rose-100 text-rose-700 px-3 py-1 rounded-full text-xs font-extrabold">ملغي ❌</span>'
+                };
+
+                const typeBadge = {
+                    delivery: 'توصيل للمنزل',
+                    pickup: 'استلام من الفرع',
+                    dinein: 'محلي داخل المطعم'
+                };
+
+                grid.innerHTML = filtered.map(order => `
+                    <div class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-4">
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                                <div>
+                                    <span class="font-extrabold text-sm text-slate-900">${order.id}</span>
+                                    <span class="text-[11px] text-slate-400 block">${order.date}</span>
+                                </div>
+                                ${statusBadge[order.status] || ''}
+                            </div>
+
+                            <div class="text-xs space-y-1 bg-slate-50 p-3 rounded-2xl">
+                                <p><strong class="text-slate-700">العميل:</strong> ${order.customerName} (${order.customerPhone || 'بدون هاتف'})</p>
+                                <p><strong class="text-slate-700">نوع الطلب:</strong> ${typeBadge[order.type] || order.type} ${order.tableNum ? `- طاولة (${order.tableNum})` : ''}</p>
+                                ${order.address ? `<p><strong class="text-slate-700">العنوان:</strong> ${order.zoneName} - ${order.address}</p>` : ''}
+                                ${order.notes ? `<p class="text-amber-700"><strong>ملاحظات:</strong> ${order.notes}</p>` : ''}
+                            </div>
+
+                            <div class="space-y-1 text-xs border-b border-slate-100 pb-3">
+                                ${order.items.map(i => `
+                                    <div class="flex justify-between font-bold text-slate-700">
+                                        <span>${i.qty}x ${i.name}</span>
+                                        <span>${this.formatMoney(i.price * i.qty)}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+
+                            <div class="flex justify-between items-center text-sm font-extrabold text-slate-900">
+                                <span>الإجمالي النهائي:</span>
+                                <span class="text-primary-600 text-base">${this.formatMoney(order.total)}</span>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2 pt-2 border-t border-slate-100">
+                            <div class="grid grid-cols-3 gap-1.5">
+                                <button onclick="app.updateOrderStatus('${order.id}', 'preparing')" class="py-2 rounded-xl text-[11px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-700 transition">تحضير</button>
+                                <button onclick="app.updateOrderStatus('${order.id}', 'delivering')" class="py-2 rounded-xl text-[11px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 transition">توصيل</button>
+                                <button onclick="app.updateOrderStatus('${order.id}', 'completed')" class="py-2 rounded-xl text-[11px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition">مكتمل</button>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="app.printReceipt('${order.id}')" class="flex-grow py-2.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center gap-1.5 transition">
+                                    <i class="fa-solid fa-print"></i>
+                                    <span>طباعة فاتورة الكاشير</span>
+                                </button>
+                                ${canCancel ? `
+                                    <button onclick="app.updateOrderStatus('${order.id}', 'cancelled')" class="px-3 py-2.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-600 transition" title="إلغاء الطلب">
+                                        <i class="fa-solid fa-ban"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            },
+
+            updateOrderStatus(orderId, newStatus) {
+                if (newStatus === 'cancelled' && this.currentUser?.role === 'cashier' && !this.currentUser.data.permissions.canCancel) {
+                    this.toast('ليس لديك صلاحية لإلغاء الطلبات', 'error');
+                    return;
+                }
+                const order = this.db.orders.find(o => o.id === orderId);
+                if (!order) return;
+                order.status = newStatus;
+                this.saveDB();
+                this.toast(`تم تحديث حالة الطلب ${orderId}`);
+
+                if (this.currentUser?.role === 'cashier') {
+                    this.renderCashierOrders();
+                    this.updateCashierSalesBadge();
+                } else if (this.currentUser?.role === 'admin') {
+                    this.renderAdminAnalytics();
+                }
+            },
+
+            // نقطة البيع المباشر (POS)
+            renderPOSMenu() {
+                const grid = document.getElementById('pos-menu-grid');
+                const q = (document.getElementById('pos-search')?.value || '').trim().toLowerCase();
+                const items = this.db.menu.filter(m => m.available && m.name.toLowerCase().includes(q));
+
+                grid.innerHTML = items.map(m => `
+                    <button onclick="app.addToPOSCart('${m.id}')" class="bg-slate-50 hover:bg-primary-50 border border-slate-200 hover:border-primary-300 p-3 rounded-2xl text-right transition flex flex-col justify-between gap-2 group">
+                        <img src="${m.image}" class="w-full h-24 object-cover rounded-xl">
+                        <div>
+                            <h5 class="text-xs font-extrabold text-slate-900 line-clamp-1">${m.name}</h5>
+                            <p class="text-xs font-bold text-primary-600 mt-1">${this.formatMoney(m.price)}</p>
+                        </div>
+                    </button>
+                `).join('');
+            },
+
+            addToPOSCart(mealId) {
+                const meal = this.db.menu.find(m => m.id === mealId);
+                if (!meal) return;
+                const ex = this.posCart.find(i => i.id === mealId);
+                if (ex) ex.qty += 1;
+                else this.posCart.push({ id: meal.id, name: meal.name, price: Number(meal.price), qty: 1 });
+                this.renderPOSCart();
+            },
+
+            changePOSQty(mealId, delta) {
+                const item = this.posCart.find(i => i.id === mealId);
+                if (!item) return;
+                item.qty += delta;
+                if (item.qty <= 0) this.posCart = this.posCart.filter(i => i.id !== mealId);
+                this.renderPOSCart();
+            },
+
+            clearPOSCart() {
+                this.posCart = [];
+                if (document.getElementById('pos-manual-discount')) {
+                    document.getElementById('pos-manual-discount').value = 0;
+                }
+                this.renderPOSCart();
+            },
+
+            renderPOSCart() {
+                const container = document.getElementById('pos-cart-items');
+                if (this.posCart.length === 0) {
+                    container.innerHTML = `<p class="text-xs text-slate-400 text-center py-8">اختر أصنافاً من القائمة لإضافتها</p>`;
+                } else {
+                    container.innerHTML = this.posCart.map(i => `
+                        <div class="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-xl text-xs">
+                            <div class="flex-grow">
+                                <p class="font-bold text-slate-800">${i.name}</p>
+                                <p class="text-primary-600 font-bold">${this.formatMoney(i.price * i.qty)}</p>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button onclick="app.changePOSQty('${i.id}', -1)" class="w-6 h-6 bg-white border rounded-lg font-bold">-</button>
+                                <span class="w-5 text-center font-extrabold">${i.qty}</span>
+                                <button onclick="app.changePOSQty('${i.id}', 1)" class="w-6 h-6 bg-white border rounded-lg font-bold text-primary-600">+</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                const subtotal = this.posCart.reduce((s, i) => s + i.price * i.qty, 0);
+                const canDiscount = this.currentUser?.data?.permissions?.canDiscount;
+                const manualDisc = canDiscount ? Number(document.getElementById('pos-manual-discount')?.value || 0) : 0;
+                const total = Math.max(0, subtotal - manualDisc);
+
+                document.getElementById('pos-subtotal').textContent = this.formatMoney(subtotal);
+                document.getElementById('pos-total').textContent = this.formatMoney(total);
+            },
+
+            submitPOSOrder(andPrint = false) {
+                if (this.posCart.length === 0) {
+                    this.toast('الفاتورة فارغة!', 'error');
+                    return;
+                }
+                const custName = document.getElementById('pos-cust-name').value.trim() || 'عميل مباشر (POS)';
+                const orderType = document.getElementById('pos-order-type').value;
+                const subtotal = this.posCart.reduce((s, i) => s + i.price * i.qty, 0);
+                const canDiscount = this.currentUser?.data?.permissions?.canDiscount;
+                const discount = canDiscount ? Number(document.getElementById('pos-manual-discount')?.value || 0) : 0;
+                const total = Math.max(0, subtotal - discount);
+
+                const orderId = 'POS-' + Math.floor(1000 + Math.random() * 9000);
+                const now = new Date();
+                const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+                const newOrder = {
+                    id: orderId,
+                    date: dateStr,
+                    type: orderType,
+                    customerName: custName,
+                    customerPhone: '',
+                    address: '',
+                    zoneName: '',
+                    tableNum: '',
+                    items: this.posCart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
+                    subtotal,
+                    discount,
+                    deliveryFee: 0,
+                    total,
+                    status: 'completed',
+                    notes: '',
+                    createdBy: this.currentUser?.data?.name || 'كاشير'
+                };
+
+                newOrder.items.forEach(item => {
+                    const m = this.db.menu.find(x => x.id === item.id);
+                    if (m) m.salesCount = (m.salesCount || 0) + item.qty;
+                });
+
+                this.db.orders.unshift(newOrder);
+                this.saveDB();
+                this.clearPOSCart();
+                document.getElementById('pos-cust-name').value = '';
+                this.updateCashierSalesBadge();
+                this.toast(`تم إنشاء فاتورة ${orderId} بنجاح`);
+
+                if (andPrint) {
+                    this.printReceipt(orderId);
+                }
+            },
+
+            // إدارة توفر الوجبات السريع من الكاشير
+            renderCashierMenuAvailability() {
+                const grid = document.getElementById('cashier-menu-availability-grid');
+                grid.innerHTML = this.db.menu.map(m => `
+                    <div class="p-4 rounded-2xl border ${m.available ? 'bg-white border-slate-200' : 'bg-rose-50/50 border-rose-200'} flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <img src="${m.image}" class="w-12 h-12 rounded-xl object-cover">
+                            <div>
+                                <h5 class="text-xs font-extrabold text-slate-900">${m.name}</h5>
+                                <span class="text-[11px] font-bold ${m.available ? 'text-emerald-600' : 'text-rose-600'}">
+                                    ${m.available ? 'متوفر حالياً' : 'نفذت الكمية'}
+                                </span>
+                            </div>
+                        </div>
+                        <button onclick="app.toggleMealAvailability('${m.id}')" class="px-3 py-2 rounded-xl text-xs font-bold ${m.available ? 'bg-rose-100 text-rose-700' : 'bg-emerald-600 text-white'}">
+                            ${m.available ? 'إيقاف' : 'تفعيل'}
+                        </button>
+                    </div>
+                `).join('');
+            },
+
+            // طباعة الفاتورة الحرارية (@media print)
+            printReceipt(orderId) {
+                const order = this.db.orders.find(o => o.id === orderId);
+                if (!order) return;
+
+                const printArea = document.getElementById('print-area');
+                const typeLabels = { delivery: 'توصيل للمنزل', pickup: 'سفري / استلام', dinein: 'محلي بالمطعم' };
+
+                printArea.innerHTML = `
+                    <div style="text-align:center; border-bottom:1px dashed #000; padding-bottom:8px; margin-bottom:8px;">
+                        <h2 style="font-size:16px; font-weight:800; margin:0;">${this.db.settings.restoName}</h2>
+                        <p style="font-size:11px; margin:2px 0;">فاتورة ضريبية مبسطة</p>
+                        <p style="font-size:11px; margin:2px 0;">رقم الطلب: <strong>${order.id}</strong></p>
+                        <p style="font-size:10px; margin:2px 0;">التاريخ: ${order.date}</p>
+                    </div>
+
+                    <div style="font-size:11px; margin-bottom:8px; border-bottom:1px dashed #000; padding-bottom:6px;">
+                        <div><strong>العميل:</strong> ${order.customerName}</div>
+                        ${order.customerPhone ? `<div><strong>الهاتف:</strong> ${order.customerPhone}</div>` : ''}
+                        <div><strong>النوع:</strong> ${typeLabels[order.type] || order.type} ${order.tableNum ? `(طاولة ${order.tableNum})` : ''}</div>
+                        ${order.address ? `<div><strong>العنوان:</strong> ${order.zoneName} - ${order.address}</div>` : ''}
+                    </div>
+
+                    <table style="width:100%; font-size:11px; border-collapse:collapse; margin-bottom:8px;">
+                        <thead>
+                            <tr style="border-bottom:1px solid #000;">
+                                <th style="text-align:right; padding:3px 0;">الصنف</th>
+                                <th style="text-align:center; padding:3px 0;">الكمية</th>
+                                <th style="text-align:left; padding:3px 0;">السعر</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${order.items.map(i => `
+                                <tr style="border-bottom:1px dotted #ccc;">
+                                    <td style="padding:4px 0;">${i.name}</td>
+                                    <td style="text-align:center; padding:4px 0;">${i.qty}</td>
+                                    <td style="text-align:left; padding:4px 0;">${this.formatMoney(i.price * i.qty)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+
+                    <div style="border-top:1px dashed #000; padding-top:6px; font-size:11px;">
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>المجموع الفرعي:</span>
+                            <span>${this.formatMoney(order.subtotal)}</span>
+                        </div>
+                        ${order.discount > 0 ? `
+                            <div style="display:flex; justify-content:space-between;">
+                                <span>الخصم:</span>
+                                <span>-${this.formatMoney(order.discount)}</span>
+                            </div>
+                        ` : ''}
+                        ${order.deliveryFee > 0 ? `
+                            <div style="display:flex; justify-content:space-between;">
+                                <span>رسوم التوصيل:</span>
+                                <span>${this.formatMoney(order.deliveryFee)}</span>
+                            </div>
+                        ` : ''}
+                        <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:800; margin-top:4px; border-top:1px solid #000; padding-top:4px;">
+                            <span>الإجمالي:</span>
+                            <span>${this.formatMoney(order.total)}</span>
+                        </div>
+                    </div>
+
+                    <div style="text-align:center; margin-top:12px; font-size:10px; border-top:1px dashed #000; padding-top:6px;">
+                        <p style="margin:2px 0;">شكراً لاختياركم ${this.db.settings.restoName}</p>
+                        <p style="margin:2px 0;">نتمنى لكم وجبة شهية وصحة دائمة</p>
+                    </div>
+                `;
+
+                window.print();
+            },
+
+
+            // ==========================================
+            // لوحة تحكم الأدمن / المالك (Admin Dashboard)
+            // ==========================================
+            initAdminDashboard() {
+                this.switchAdminTab('analytics');
+            },
+
+            switchAdminTab(tab) {
+                const tabs = ['analytics', 'menu', 'staff', 'settings'];
+                tabs.forEach(t => {
+                    document.getElementById(`admin-section-${t}`).classList.toggle('hidden', t !== tab);
+                    const btn = document.getElementById(`atab-${t}`);
+                    if (t === tab) {
+                        btn.className = 'px-3.5 py-2 rounded-xl text-xs font-bold bg-primary-600 text-white transition';
+                    } else {
+                        btn.className = 'px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 transition';
+                    }
+                });
+
+                if (tab === 'analytics') this.renderAdminAnalytics();
+                if (tab === 'menu') this.renderAdminMenuSection();
+                if (tab === 'staff') this.renderAdminStaffSection();
+                if (tab === 'settings') this.renderAdminSettingsSection();
+            },
+
+            // 1. الإحصائيات والطلبات للأدمن
+            renderAdminAnalytics() {
+                const completed = this.db.orders.filter(o => o.status === 'completed');
+                const active = this.db.orders.filter(o => o.status === 'preparing' || o.status === 'delivering');
+                const totalSales = completed.reduce((s, o) => s + Number(o.total), 0);
+
+                const sortedMeals = [...this.db.menu].sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0));
+                const topMeal = sortedMeals[0];
+
+                document.getElementById('stat-total-sales').textContent = this.formatMoney(totalSales);
+                document.getElementById('stat-completed-orders').textContent = completed.length;
+                document.getElementById('stat-active-orders').textContent = active.length;
+                document.getElementById('stat-top-item').textContent = topMeal ? topMeal.name : '-';
+
+                // قائمة الأكثر مبيعاً
+                document.getElementById('admin-top-items-list').innerHTML = sortedMeals.slice(0, 5).map((m, idx) => `
+                    <div class="flex items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                        <div class="flex items-center gap-3">
+                            <span class="w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs font-extrabold flex items-center justify-center">${idx + 1}</span>
+                            <img src="${m.image}" class="w-10 h-10 rounded-xl object-cover">
+                            <div>
+                                <h5 class="text-xs font-extrabold text-slate-800 line-clamp-1">${m.name}</h5>
+                                <p class="text-[11px] text-slate-400">${this.formatMoney(m.price)}</p>
+                            </div>
+                        </div>
+                        <span class="bg-white border border-slate-200 px-2.5 py-1 rounded-xl text-xs font-extrabold text-slate-700">${m.salesCount || 0} طلب</span>
+                    </div>
+                `).join('');
+
+                // جدول جميع الطلبات
+                const tbody = document.getElementById('admin-orders-tbody');
+                const statusSelect = (o) => `
+                    <select onchange="app.updateOrderStatus('${o.id}', this.value)" class="px-2.5 py-1 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50">
+                        <option value="preparing" ${o.status === 'preparing' ? 'selected' : ''}>قيد التحضير</option>
+                        <option value="delivering" ${o.status === 'delivering' ? 'selected' : ''}>جاري التوصيل</option>
+                        <option value="completed" ${o.status === 'completed' ? 'selected' : ''}>مكتمل</option>
+                        <option value="cancelled" ${o.status === 'cancelled' ? 'selected' : ''}>ملغي</option>
+                    </select>
+                `;
+
+                tbody.innerHTML = this.db.orders.map(o => `
+                    <tr class="hover:bg-slate-50/80">
+                        <td class="py-3 font-extrabold text-slate-900">
+                            ${o.id}
+                            <span class="block text-[10px] text-slate-400 font-normal">${o.date}</span>
+                        </td>
+                        <td class="py-3">
+                            <span class="font-bold text-slate-800">${o.customerName}</span>
+                            <span class="block text-[11px] text-slate-400">${o.type} ${o.createdBy ? `• ${o.createdBy}` : ''}</span>
+                        </td>
+                        <td class="py-3 font-extrabold text-primary-600">${this.formatMoney(o.total)}</td>
+                        <td class="py-3">${statusSelect(o)}</td>
+                        <td class="py-3">
+                            <div class="flex items-center gap-1.5">
+                                <button onclick="app.printReceipt('${o.id}')" class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700" title="طباعة الفاتورة">
+                                    <i class="fa-solid fa-print"></i>
+                                </button>
+                                <button onclick="app.deleteOrder('${o.id}')" class="p-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600" title="حذف الطلب نهائياً">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            },
+
+            deleteOrder(orderId) {
+                if (!confirm('هل أنت متأكد من حذف هذا الطلب نهائياً من السجل؟')) return;
+                this.db.orders = this.db.orders.filter(o => o.id !== orderId);
+                this.saveDB();
+                this.renderAdminAnalytics();
+                this.toast('تم حذف الطلب');
+            },
+
+            // 2. إدارة المنيو والتصنيفات للأدمن
+            renderAdminMenuSection() {
+                // عرض التصنيفات
+                const catList = document.getElementById('admin-categories-list');
+                catList.innerHTML = this.db.categories.map(c => `
+                    <div class="inline-flex items-center gap-2 bg-slate-100 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700">
+                        <i class="fa-solid ${c.icon}"></i>
+                        <span>${c.name}</span>
+                        <button onclick="app.deleteCategory('${c.id}')" class="text-rose-500 hover:text-rose-700 mr-1">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                `).join('');
+
+                // عرض الوجبات
+                const mealsGrid = document.getElementById('admin-meals-grid');
+                mealsGrid.innerHTML = this.db.menu.map(m => {
+                    const cat = this.db.categories.find(c => c.id === m.categoryId);
+                    return `
+                        <div class="bg-slate-50 rounded-3xl border border-slate-200/80 overflow-hidden flex flex-col justify-between">
+                            <div>
+                                <div class="relative h-40">
+                                    <img src="${m.image}" class="w-full h-full object-cover">
+                                    <span class="absolute top-2 right-2 bg-white/90 text-[11px] font-bold px-2.5 py-1 rounded-full">${cat ? cat.name : 'عام'}</span>
+                                    <span class="absolute top-2 left-2 px-2.5 py-1 rounded-full text-[11px] font-bold ${m.available ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}">
+                                        ${m.available ? 'متوفر' : 'نفذت الكمية'}
+                                    </span>
+                                </div>
+                                <div class="p-4 space-y-1">
+                                    <h4 class="font-extrabold text-sm text-slate-900 line-clamp-1">${m.name}</h4>
+                                    <p class="text-xs text-slate-500 line-clamp-2">${m.desc}</p>
+                                    <p class="text-sm font-extrabold text-primary-600 pt-1">${this.formatMoney(m.price)}</p>
+                                </div>
+                            </div>
+
+                            <div class="p-3 bg-white border-t border-slate-100 flex items-center justify-between gap-2">
+                                <button onclick="app.toggleMealAvailability('${m.id}')" class="flex-grow py-2 rounded-xl text-xs font-bold ${m.available ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}">
+                                    ${m.available ? 'إيقاف التوفر' : 'تفعيل التوفر'}
+                                </button>
+                                <button onclick="app.openMealModal('${m.id}')" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700" title="تعديل">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                                <button onclick="app.deleteMeal('${m.id}')" class="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600" title="حذف">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            },
+
+            addCategory() {
+                const name = document.getElementById('new-cat-name').value.trim();
+                const icon = document.getElementById('new-cat-icon').value.trim() || 'fa-utensils';
+                if (!name) {
+                    this.toast('أدخل اسم التصنيف', 'error');
+                    return;
+                }
+                this.db.categories.push({
+                    id: 'cat_' + Date.now(),
+                    name,
+                    icon
+                });
+                this.saveDB();
+                document.getElementById('new-cat-name').value = '';
+                this.renderAdminMenuSection();
+                this.toast('تمت إضافة التصنيف بنجاح');
+            },
+
+            deleteCategory(catId) {
+                if (this.db.categories.length <= 1) {
+                    this.toast('يجب بقاء تصنيف واحد على الأقل', 'error');
+                    return;
+                }
+                this.db.categories = this.db.categories.filter(c => c.id !== catId);
+                this.saveDB();
+                this.renderAdminMenuSection();
+                this.toast('تم حذف التصنيف');
+            },
+
+            openMealModal(mealId = null) {
+                const modal = document.getElementById('meal-modal');
+                const catSelect = document.getElementById('meal-category');
+                catSelect.innerHTML = this.db.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+                if (mealId) {
+                    const m = this.db.menu.find(x => x.id === mealId);
+                    if (!m) return;
+                    document.getElementById('meal-modal-title').textContent = 'تعديل بيانات الوجبة';
+                    document.getElementById('meal-id').value = m.id;
+                    document.getElementById('meal-name').value = m.name;
+                    document.getElementById('meal-category').value = m.categoryId;
+                    document.getElementById('meal-price').value = m.price;
+                    document.getElementById('meal-image').value = m.image;
+                    document.getElementById('meal-desc').value = m.desc;
+                    document.getElementById('meal-available').checked = m.available;
+                } else {
+                    document.getElementById('meal-modal-title').textContent = 'إضافة وجبة جديدة';
+                    document.getElementById('meal-id').value = '';
+                    document.getElementById('meal-name').value = '';
+                    document.getElementById('meal-price').value = '';
+                    document.getElementById('meal-image').value = '';
+                    document.getElementById('meal-desc').value = '';
+                    document.getElementById('meal-available').checked = true;
+                }
+                modal.classList.remove('hidden');
+            },
+
+            closeMealModal() {
+                document.getElementById('meal-modal').classList.add('hidden');
+            },
+
+            saveMeal(e) {
+                e.preventDefault();
+                const id = document.getElementById('meal-id').value;
+                const mealData = {
+                    name: document.getElementById('meal-name').value.trim(),
+                    categoryId: document.getElementById('meal-category').value,
+                    price: Number(document.getElementById('meal-price').value),
+                    image: document.getElementById('meal-image').value.trim(),
+                    desc: document.getElementById('meal-desc').value.trim(),
+                    available: document.getElementById('meal-available').checked
+                };
+
+                if (id) {
+                    const idx = this.db.menu.findIndex(m => m.id === id);
+                    if (idx > -1) {
+                        this.db.menu[idx] = { ...this.db.menu[idx], ...mealData };
+                    }
+                    this.toast('تم تحديث الوجبة بنجاح');
+                } else {
+                    this.db.menu.unshift({
+                        id: 'm_' + Date.now(),
+                        ...mealData,
+                        salesCount: 0
+                    });
+                    this.toast('تمت إضافة الوجبة الجديدة');
+                }
+
+                this.saveDB();
+                this.closeMealModal();
+                this.renderAdminMenuSection();
+            },
+
+            toggleMealAvailability(mealId) {
+                const meal = this.db.menu.find(m => m.id === mealId);
+                if (!meal) return;
+                meal.available = !meal.available;
+                this.saveDB();
+                if (this.currentUser?.role === 'admin') this.renderAdminMenuSection();
+                if (this.currentUser?.role === 'cashier') this.renderCashierMenuAvailability();
+                this.toast(`تم تحديث حالة "${meal.name}"`);
+            },
+
+            deleteMeal(mealId) {
+                if (!confirm('هل تريد حذف هذه الوجبة نهائياً من المنيو؟')) return;
+                this.db.menu = this.db.menu.filter(m => m.id !== mealId);
+                this.saveDB();
+                this.renderAdminMenuSection();
+                this.toast('تم حذف الوجبة');
+            },
+
+            // 3. إدارة العمال والصلاحيات (Staff & RBAC)
+            renderAdminStaffSection() {
+                const list = document.getElementById('admin-staff-list');
+                if (this.db.staff.length === 0) {
+                    list.innerHTML = `<p class="text-xs text-slate-400 text-center py-8">لا يوجد موظفون مضافون حالياً</p>`;
+                    return;
+                }
+
+                list.innerHTML = this.db.staff.map(s => `
+                    <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-wrap items-center justify-between gap-4">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <h4 class="font-extrabold text-sm text-slate-900">${s.name}</h4>
+                                <span class="bg-slate-200 text-slate-700 text-[11px] px-2.5 py-0.5 rounded-full font-bold">المستخدم: ${s.username}</span>
+                                <span class="bg-amber-100 text-amber-800 text-[11px] px-2.5 py-0.5 rounded-full font-bold">السر: ${s.password}</span>
+                            </div>
+                            <div class="flex flex-wrap gap-1.5 pt-1">
+                                <span class="text-[11px] px-2 py-0.5 rounded-lg font-bold ${s.permissions.canCancel ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-400 line-through'}">إلغاء الطلبات</span>
+                                <span class="text-[11px] px-2 py-0.5 rounded-lg font-bold ${s.permissions.canDiscount ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-400 line-through'}">خصم يدوي</span>
+                                <span class="text-[11px] px-2 py-0.5 rounded-lg font-bold ${s.permissions.canManageMenu ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-400 line-through'}">إدارة التوفر</span>
+                                <span class="text-[11px] px-2 py-0.5 rounded-lg font-bold ${s.permissions.canViewSales ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-400 line-through'}">رؤية المبيعات</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="app.editStaff('${s.id}')" class="px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-100">
+                                <i class="fa-solid fa-pen ml-1"></i> تعديل الصلاحيات
+                            </button>
+                            <button onclick="app.deleteStaff('${s.id}')" class="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            },
+
+            saveStaff() {
+                const editId = document.getElementById('staff-edit-id').value;
+                const name = document.getElementById('staff-name').value.trim();
+                const username = document.getElementById('staff-username').value.trim();
+                const password = document.getElementById('staff-password').value.trim();
+
+                if (!name || !username || !password) {
+                    this.toast('يرجى ملء جميع حقول الموظف', 'error');
+                    return;
+                }
+
+                const permissions = {
+                    canCancel: document.getElementById('perm-cancel').checked,
+                    canDiscount: document.getElementById('perm-discount').checked,
+                    canManageMenu: document.getElementById('perm-menu').checked,
+                    canViewSales: document.getElementById('perm-sales').checked
+                };
+
+                if (editId) {
+                    const idx = this.db.staff.findIndex(s => s.id === editId);
+                    if (idx > -1) {
+                        this.db.staff[idx] = { id: editId, name, username, password, permissions };
+                    }
+                    this.toast('تم تحديث بيانات وصلاحيات الموظف');
+                } else {
+                    if (this.db.staff.some(s => s.username.toLowerCase() === username.toLowerCase()) || username.toLowerCase() === 'admin') {
+                        this.toast('اسم المستخدم مسجل مسبقاً، اختر اسماً آخر', 'error');
+                        return;
+                    }
+                    this.db.staff.push({
+                        id: 'st_' + Date.now(),
+                        name,
+                        username,
+                        password,
+                        permissions
+                    });
+                    this.toast('تمت إضافة الموظف بنجاح');
+                }
+
+                this.saveDB();
+                this.resetStaffForm();
+                this.renderAdminStaffSection();
+            },
+
+            editStaff(staffId) {
+                const s = this.db.staff.find(x => x.id === staffId);
+                if (!s) return;
+                document.getElementById('staff-form-title').textContent = `تعديل الموظف: ${s.name}`;
+                document.getElementById('staff-edit-id').value = s.id;
+                document.getElementById('staff-name').value = s.name;
+                document.getElementById('staff-username').value = s.username;
+                document.getElementById('staff-password').value = s.password;
+
+                document.getElementById('perm-cancel').checked = s.permissions.canCancel;
+                document.getElementById('perm-discount').checked = s.permissions.canDiscount;
+                document.getElementById('perm-menu').checked = s.permissions.canManageMenu;
+                document.getElementById('perm-sales').checked = s.permissions.canViewSales;
+
+                document.getElementById('staff-cancel-edit').classList.remove('hidden');
+            },
+
+            resetStaffForm() {
+                document.getElementById('staff-form-title').textContent = 'إضافة موظف كاشير جديد';
+                document.getElementById('staff-edit-id').value = '';
+                document.getElementById('staff-name').value = '';
+                document.getElementById('staff-username').value = '';
+                document.getElementById('staff-password').value = '';
+                document.getElementById('perm-cancel').checked = false;
+                document.getElementById('perm-discount').checked = false;
+                document.getElementById('perm-menu').checked = false;
+                document.getElementById('perm-sales').checked = false;
+                document.getElementById('staff-cancel-edit').classList.add('hidden');
+            },
+
+            deleteStaff(staffId) {
+                if (!confirm('هل أنت متأكد من حذف هذا الموظف؟')) return;
+                this.db.staff = this.db.staff.filter(s => s.id !== staffId);
+                this.saveDB();
+                this.renderAdminStaffSection();
+                this.toast('تم حذف الموظف');
+            },
+
+            // 4. الإعدادات العامة، مناطق التوصيل، الكوبونات، والنسخ الاحتياطي
+            renderAdminSettingsSection() {
+                const s = this.db.settings;
+                document.getElementById('set-resto-name').value = s.restoName;
+                document.getElementById('set-currency').value = s.currency;
+                document.getElementById('set-whatsapp').value = s.whatsapp;
+                document.getElementById('set-logo-icon').value = s.logoIcon;
+                document.getElementById('set-admin-pass').value = s.adminPass;
+
+                // مناطق التوصيل
+                document.getElementById('admin-zones-list').innerHTML = this.db.zones.map(z => `
+                    <div class="flex items-center justify-between bg-slate-50 px-3.5 py-2.5 rounded-xl border border-slate-200/70 text-xs">
+                        <span class="font-bold text-slate-800">${z.name}</span>
+                        <div class="flex items-center gap-3">
+                            <span class="font-extrabold text-primary-600">${this.formatMoney(z.fee)}</span>
+                            <button onclick="app.deleteDeliveryZone('${z.id}')" class="text-rose-500 hover:text-rose-700">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+
+                // الكوبونات
+                document.getElementById('admin-coupons-list').innerHTML = this.db.coupons.map(c => `
+                    <div class="flex items-center justify-between bg-slate-50 px-3.5 py-2.5 rounded-xl border border-slate-200/70 text-xs">
+                        <span class="font-extrabold text-slate-900 bg-white px-2.5 py-1 rounded-lg border">${c.code}</span>
+                        <div class="flex items-center gap-3">
+                            <span class="font-bold text-emerald-600">خصم ${c.percent}%</span>
+                            <button onclick="app.deleteCoupon('${c.code}')" class="text-rose-500 hover:text-rose-700">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            },
+
+            saveGeneralSettings() {
+                this.db.settings.restoName = document.getElementById('set-resto-name').value.trim() || 'مطعم الذواقة';
+                this.db.settings.currency = document.getElementById('set-currency').value.trim() || 'ر.س';
+                this.db.settings.whatsapp = document.getElementById('set-whatsapp').value.trim();
+                this.db.settings.logoIcon = document.getElementById('set-logo-icon').value.trim() || 'fa-utensils';
+                this.db.settings.adminPass = document.getElementById('set-admin-pass').value.trim() || 'admin123';
+
+                this.saveDB();
+                this.applyBranding();
+                this.toast('تم حفظ إعدادات المطعم بنجاح');
+            },
+
+            addDeliveryZone() {
+                const name = document.getElementById('new-zone-name').value.trim();
+                const fee = Number(document.getElementById('new-zone-fee').value);
+                if (!name || isNaN(fee)) {
+                    this.toast('أدخل اسم المنطقة وسعر التوصيل بشكل صحيح', 'error');
+                    return;
+                }
+                this.db.zones.push({ id: 'z_' + Date.now(), name, fee });
+                this.saveDB();
+                document.getElementById('new-zone-name').value = '';
+                document.getElementById('new-zone-fee').value = '';
+                this.renderAdminSettingsSection();
+                this.toast('تمت إضافة منطقة التوصيل');
+            },
+
+            deleteDeliveryZone(zoneId) {
+                if (this.db.zones.length <= 1) {
+                    this.toast('يجب بقاء منطقة توصيل واحدة على الأقل', 'error');
+                    return;
+                }
+                this.db.zones = this.db.zones.filter(z => z.id !== zoneId);
+                this.saveDB();
+                this.renderAdminSettingsSection();
+            },
+
+            addCoupon() {
+                const code = document.getElementById('new-coupon-code').value.trim().toUpperCase();
+                const percent = Number(document.getElementById('new-coupon-percent').value);
+                if (!code || !percent || percent <= 0 || percent > 100) {
+                    this.toast('أدخل كود خصم ونسبة صحيحة (1 - 100)', 'error');
+                    return;
+                }
+                this.db.coupons = this.db.coupons.filter(c => c.code !== code);
+                this.db.coupons.push({ code, percent });
+                this.saveDB();
+                document.getElementById('new-coupon-code').value = '';
+                document.getElementById('new-coupon-percent').value = '';
+                this.renderAdminSettingsSection();
+                this.toast('تمت إضافة كود الخصم');
+            },
+
+            deleteCoupon(code) {
+                this.db.coupons = this.db.coupons.filter(c => c.code !== code);
+                this.saveDB();
+                this.renderAdminSettingsSection();
+            },
+
+            // تصدير واستيراد قاعدة البيانات (Backup & Restore)
+            exportDatabase() {
+                const dataStr = JSON.stringify(this.db, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `restaurant_backup_${new Date().toISOString().slice(0,10)}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                this.toast('تم تحميل ملف النسخة الاحتياطية بنجاح');
+            },
+
+            importDatabase(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const imported = JSON.parse(e.target.result);
+                        if (imported && imported.settings && imported.menu) {
+                            this.db = imported;
+                            this.saveDB();
+                            this.applyBranding();
+                            this.renderAdminSettingsSection();
+                            this.toast('تم استيراد واستعادة البيانات بنجاح!');
+                        } else {
+                            this.toast('ملف JSON غير صالح لنظام المطعم', 'error');
+                        }
+                    } catch (err) {
+                        this.toast('حدث خطأ أثناء قراءة الملف', 'error');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        };
+
+        // تشغيل التطبيق فور جهوزية الصفحة
+        window.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+</html>
